@@ -71,6 +71,19 @@ Kafka is a persistent event log, not a fire-and-forget queue. This means:
 - The Fraud Service can replay events from any offset.
 - Horizontal scaling of consumers requires zero code changes.
 
+### Why KRaft instead of Zookeeper?
+
+Kafka traditionally required Zookeeper as an external service to manage cluster metadata — which brokers exist, who leads each partition, and configuration state. This meant operating two distributed systems instead of one.
+
+KRaft (Kafka Raft) eliminates that dependency entirely. Kafka now manages its own metadata internally using the Raft consensus protocol — the same algorithm that handles leader election when a broker fails.
+
+The practical benefits:
+
+- One less system to deploy, configure and monitor
+- Lower metadata latency — no network hop to an external service
+- Faster leader election with fewer moving parts
+- Simpler local development with docker compose
+
 ### Why two separate PostgreSQL instances?
 
 Each service has its own RDS instance. If the Payment Service database goes down, the Fraud Service keeps operating without interruption — and vice versa. That is real fault isolation.
