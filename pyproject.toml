@@ -1,0 +1,7 @@
+[project]
+name = "payflow"
+version = "0.1.0"
+description = "Backend payment processing system with real-time fraud detection, built to demonstrate proficiency in distributed architectures, event-driven systems, and high-performance backend engineering applied to fintech."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
