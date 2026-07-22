@@ -20,7 +20,7 @@ class TestMoney:
             Money(amount=Decimal("0.00"), currency="USD")
 
     @pytest.mark.parametrize("currency", ["US", "USDT", "US1", "123", ""])
-    def test_verify_invalid_currency_code(self, currency):
+    def test_verify_invalid_currency_code(self, currency: str):
         with pytest.raises(ValueError, match="3-letter ISO 4217 code"):
             Money(amount=Decimal("100.00"), currency=currency)
 
@@ -29,12 +29,12 @@ class TestMoney:
         assert money.currency == "USD"
 
     @pytest.mark.parametrize("amount", [100.00, 100, "100.00", None, True])
-    def test_amount_rejects_non_decimal(self, amount):
+    def test_amount_rejects_non_decimal(self, amount: object):
         with pytest.raises(TypeError, match="Amount must be a Decimal instance"):
             Money(amount=amount, currency="USD")  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.parametrize("currency", [123, None, b"USD"])
-    def test_currency_rejects_non_string(self, currency):
+    def test_currency_rejects_non_string(self, currency: object):
         with pytest.raises(TypeError, match="Currency must be a string"):
             Money(amount=Decimal("100.00"), currency=currency)  # pyright: ignore[reportArgumentType]
 
