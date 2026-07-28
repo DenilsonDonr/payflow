@@ -5,7 +5,10 @@ description = "Backend payment processing system with real-time fraud detection,
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.18.5",
     "fastapi>=0.139.2",
+    "psycopg[binary]>=3.3.4",
+    "python-dotenv>=1.2.2",
 ]
 
 [tool.pytest.ini_options]
