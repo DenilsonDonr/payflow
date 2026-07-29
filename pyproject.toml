@@ -13,6 +13,10 @@ dependencies = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+strict = true
+markers = [
+    "integration: requires external services (e.g. a running Postgres) to be up",
+]
 
 [dependency-groups]
 dev = [
