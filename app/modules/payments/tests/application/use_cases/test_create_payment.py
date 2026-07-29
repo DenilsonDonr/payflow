@@ -1,3 +1,5 @@
+import uuid
+
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.tests.domain.entities.test_payment import make_payment
@@ -5,7 +7,7 @@ from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemo
 from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
 
 class FailingPaymentRepository(PaymentRepositoryPort):
-    def get_payment_by_id(self, payment_id: str) -> Payment | None:
+    def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
         return None
 
     def create_payment(self, payment: Payment) -> Payment | None:
