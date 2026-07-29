@@ -12,7 +12,7 @@ def connection_db():
     try:
         db_connection.connect()
     except psycopg.OperationalError:
-        pytest.skip("PostgreSQL server is not available. You need to run 'docker-compose up -d' to run the integration tests.")
+        pytest.skip("PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests.")
 
     yield db_connection
 
