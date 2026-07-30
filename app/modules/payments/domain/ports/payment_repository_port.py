@@ -8,5 +8,5 @@ class PaymentRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    def create_payment(self, payment: Payment) -> Payment | None:
+    def create_payment(self, payment: Payment) -> Payment:
         pass
