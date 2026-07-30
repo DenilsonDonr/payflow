@@ -1,6 +1,6 @@
-def main():
-    print("Hello from payflow!")
+from fastapi import FastAPI
+from app.modules.payments.infrastructure.http.routers.payment_router import router_payment
 
+app = FastAPI()
 
-if __name__ == "__main__":
-    main()
+app.include_router(router_payment, prefix="/api/v1")
