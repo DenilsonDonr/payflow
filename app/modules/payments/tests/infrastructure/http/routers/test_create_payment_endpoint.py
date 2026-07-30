@@ -42,6 +42,14 @@ def test_create_payment_endpoint():
 
     assert response.status_code == 201
 
+def test_create_payment_endpoint_invalid_currency():
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())
+
+    # Send raw JSON so FastAPI parses and validates the body itself (returning 422);
+    # building PaymentCreateRequest(...) here would instead fail inside the test.
+    response = client.post("/api/v1/payments", json={"amount": "100.00", "currency": "US"})
+
+    assert response.status_code == 422
 
 def test_create_payment_endpoint_duplicate_error():
     app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=DuplicatePaymentRepository())
