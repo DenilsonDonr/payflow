@@ -10,7 +10,7 @@ class InMemoryPaymentRepository(PaymentRepositoryPort):
     def add(self, payment: Payment) -> None:
         self._payments[payment.id] = payment
     
-    def create_payment(self, payment: Payment) -> Payment | None:
+    def create_payment(self, payment: Payment) -> Payment:
         self.add(payment)
         return payment
     
