@@ -42,3 +42,8 @@ def test_get_payment_endpoint_not_found():
     response = client.get(f"/api/v1/payments/{non_existent_payment_id}")
 
     assert response.status_code == 404
+
+def test_get_payment_endpoint_invalid_uuid():
+    invalid_uuid = "invalid-uuid"
+    response = client.get(f"/api/v1/payments/{invalid_uuid}")
+    assert response.status_code == 422
