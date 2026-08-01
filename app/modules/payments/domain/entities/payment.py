@@ -1,11 +1,14 @@
 import uuid
 from enum import Enum
 
+from app.modules.payments.domain.exceptions.invalid_payment_transition import (InvalidPaymentTransitionError)
 from app.modules.payments.domain.value_objects.money import Money
 
 class PaymentState(Enum):
     PENDING = 'pending'
+    APPROVED = 'approved'
     COMPLETED = 'completed'
+    REJECTED = 'rejected'
     FAILED = 'failed'
 
 class Payment:
@@ -19,7 +22,7 @@ class Payment:
         self._id = id
         self._state = PaymentState.PENDING
         self._amount = amount
-        
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Payment):
             return NotImplemented
@@ -27,31 +30,37 @@ class Payment:
 
     def __hash__(self) -> int:
         return hash(self._id)
-    
+
     def __repr__(self) -> str:
         return f"Payment(id={self._id!r}, amount={self._amount!r}, state={self._state!r})"
-        
+
     @property
     def id(self) -> uuid.UUID:
         return self._id
-    
+
     @property
     def state(self) -> PaymentState:
         return self._state
-    
+
     @property
     def amount(self) -> Money:
         return self._amount
-    
+
+    def approve(self) -> None:
+        self._transition(to_state=PaymentState.APPROVED, allowed_from=PaymentState.PENDING)
+
+    def reject(self) -> None:
+        self._transition(to_state=PaymentState.REJECTED, allowed_from=PaymentState.PENDING)
+
     def complete(self) -> None:
-        if self._state != PaymentState.PENDING:
-            raise ValueError("Only pending payments can be completed.")
-        
-        self._state = PaymentState.COMPLETED
-    
+        self._transition(to_state=PaymentState.COMPLETED, allowed_from=PaymentState.APPROVED)
+
     def fail(self) -> None:
-        if self._state != PaymentState.PENDING:
-            raise ValueError("Only pending payments can be failed.")
-        
-        self._state = PaymentState.FAILED
-        
+        self._transition(to_state=PaymentState.FAILED, allowed_from=PaymentState.APPROVED)
+
+    def _transition(self, to_state: PaymentState, allowed_from: PaymentState) -> None:
+        if self._state is not allowed_from:
+            raise InvalidPaymentTransitionError(
+                f"Cannot move a payment from {self._state.value} to {to_state.value}."
+            )
+        self._state = to_state
