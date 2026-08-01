@@ -1,10 +1,10 @@
 import uuid
-from collections.abc import Callable
 from decimal import Decimal
 
 import pytest
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
+from app.modules.payments.domain.exceptions.invalid_payment_transition import (InvalidPaymentTransitionError)
 from app.modules.payments.domain.value_objects.money import Money
 
 DEFAULT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
@@ -15,6 +15,43 @@ def money(amount: str = "100.00", currency: str = "USD") -> Money:
 
 def make_payment(id: uuid.UUID = DEFAULT_ID, amount: Money | None = None) -> Payment:
     return Payment(id=id, amount=amount if amount is not None else money())
+
+def payment_in(state: PaymentState, amount: Money | None = None) -> Payment:
+    """Drive a fresh payment into `state` through its legal transitions only."""
+    payment = make_payment(amount=amount)
+    if state is PaymentState.PENDING:
+        return payment
+    if state is PaymentState.APPROVED:
+        payment.approve()
+        return payment
+    if state is PaymentState.REJECTED:
+        payment.reject()
+        return payment
+    if state is PaymentState.COMPLETED:
+        payment.approve()
+        payment.complete()
+        return payment
+    if state is PaymentState.FAILED:
+        payment.approve()
+        payment.fail()
+        return payment
+    raise AssertionError(f"unhandled state: {state}")
+
+ACTIONS = ("approve", "reject", "complete", "fail")
+
+LEGAL_TRANSITIONS = {
+    (PaymentState.PENDING, "approve"),
+    (PaymentState.PENDING, "reject"),
+    (PaymentState.APPROVED, "complete"),
+    (PaymentState.APPROVED, "fail"),
+}
+
+ILLEGAL_TRANSITIONS = [
+    (state, action)
+    for state in PaymentState
+    for action in ACTIONS
+    if (state, action) not in LEGAL_TRANSITIONS
+]
 
 class TestPaymentCreation:
     def test_creates_payment_with_given_id_and_amount(self):
@@ -38,75 +75,41 @@ class TestPaymentCreation:
 
 
 class TestPaymentTransitions:
-    def test_pending_payment_can_be_completed(self):
-        payment = make_payment()
-
-        payment.complete()
-
-        assert payment.state == PaymentState.COMPLETED
-
-    def test_pending_payment_can_be_failed(self):
-        payment = make_payment()
-
-        payment.fail()
-
-        assert payment.state == PaymentState.FAILED
-
     @pytest.mark.parametrize(
-        ("reach_terminal", "attempted_action", "expected_state", "expected_message"),
+        ("from_state", "action", "expected_state"),
         [
-            pytest.param(
-                Payment.complete,
-                Payment.complete,
-                PaymentState.COMPLETED,
-                "Only pending payments can be completed",
-                id="completed-cannot-be-completed",
-            ),
-            pytest.param(
-                Payment.complete,
-                Payment.fail,
-                PaymentState.COMPLETED,
-                "Only pending payments can be failed",
-                id="completed-cannot-be-failed",
-            ),
-            pytest.param(
-                Payment.fail,
-                Payment.fail,
-                PaymentState.FAILED,
-                "Only pending payments can be failed",
-                id="failed-cannot-be-failed",
-            ),
-            pytest.param(
-                Payment.fail,
-                Payment.complete,
-                PaymentState.FAILED,
-                "Only pending payments can be completed",
-                id="failed-cannot-be-completed",
-            ),
+            pytest.param(PaymentState.PENDING, "approve", PaymentState.APPROVED, id="pending->approved"),
+            pytest.param(PaymentState.PENDING, "reject", PaymentState.REJECTED, id="pending->rejected"),
+            pytest.param(PaymentState.APPROVED, "complete", PaymentState.COMPLETED, id="approved->completed"),
+            pytest.param(PaymentState.APPROVED, "fail", PaymentState.FAILED, id="approved->failed"),
         ],
     )
-    def test_rejects_transitions_out_of_a_terminal_state(
-        self,
-        reach_terminal: Callable[[Payment], None],
-        attempted_action: Callable[[Payment], None],
-        expected_state: PaymentState,
-        expected_message: str,
+    def test_allows_legal_transitions(
+        self, from_state: PaymentState, action: str, expected_state: PaymentState
     ):
-        payment = make_payment()
-        reach_terminal(payment)
+        payment = payment_in(from_state)
 
-        with pytest.raises(ValueError, match=expected_message):
-            attempted_action(payment)
+        getattr(payment, action)()
 
         assert payment.state == expected_state
 
-    @pytest.mark.parametrize("action", [Payment.complete, Payment.fail])
-    def test_transition_does_not_change_id_or_amount(
-        self, action: Callable[[Payment], None]
-    ):
+    @pytest.mark.parametrize(
+        ("from_state", "action"),
+        [pytest.param(state, action, id=f"{state.value}-cannot-{action}") for state, action in ILLEGAL_TRANSITIONS],
+    )
+    def test_rejects_illegal_transitions(self, from_state: PaymentState, action: str):
+        payment = payment_in(from_state)
+
+        with pytest.raises(InvalidPaymentTransitionError):
+            getattr(payment, action)()
+
+        assert payment.state == from_state
+
+    @pytest.mark.parametrize("action", ["approve", "reject"])
+    def test_transition_does_not_change_id_or_amount(self, action: str):
         payment = make_payment(amount=money("250.50"))
 
-        action(payment)
+        getattr(payment, action)()
 
         assert payment.id == DEFAULT_ID
         assert payment.amount == money("250.50")
@@ -128,8 +131,7 @@ class TestPaymentImmutability:
             setattr(payment, attribute, value)
 
     def test_a_terminal_payment_cannot_be_revived_through_the_state_attribute(self):
-        payment = make_payment()
-        payment.complete()
+        payment = payment_in(PaymentState.COMPLETED)
 
         with pytest.raises(AttributeError):
             payment.state = PaymentState.PENDING  # pyright: ignore[reportAttributeAccessIssue]
@@ -148,10 +150,9 @@ class TestPaymentIdentity:
 
     def test_same_id_is_the_same_payment_even_in_a_different_state(self):
         pending = make_payment()
-        completed = make_payment()
-        completed.complete()
+        approved = payment_in(PaymentState.APPROVED)
 
-        assert pending == completed
+        assert pending == approved
 
     def test_different_id_is_a_different_payment(self):
         assert make_payment(id=DEFAULT_ID) != make_payment(id=OTHER_ID)
