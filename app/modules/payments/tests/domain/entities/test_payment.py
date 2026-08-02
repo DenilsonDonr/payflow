@@ -114,6 +114,10 @@ class TestPaymentTransitions:
         assert payment.id == DEFAULT_ID
         assert payment.amount == money("250.50")
 
+    def test_reconstitute_restores_the_given_state(self):
+        payment = Payment.reconstitute(DEFAULT_ID, money(), PaymentState.APPROVED)
+
+        assert payment.state == PaymentState.APPROVED
 
 class TestPaymentImmutability:
     @pytest.mark.parametrize(

@@ -2,7 +2,7 @@ import uuid
 
 import psycopg
 
-from app.modules.payments.domain.entities.payment import Payment
+from app.modules.payments.domain.entities.payment import Payment, PaymentState
 from app.modules.payments.domain.value_objects.money import Money
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
@@ -17,7 +17,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    "SELECT id, amount, currency FROM payments WHERE id = %s",
+                    "SELECT id, amount, currency, state FROM payments WHERE id = %s",
                     (str(payment_id),)
                 )
                 row = cursor.fetchone()
@@ -25,11 +25,12 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
                 if row is None:
                     return None
 
-                row_id, amount, currency = row
+                row_id, amount, currency, state = row
 
-                return Payment(
+                return Payment.reconstitute(
                     id=uuid.UUID(row_id),
-                    amount=Money(amount=amount, currency=currency)
+                    amount=Money(amount=amount, currency=currency),
+                    state=PaymentState(state)
                 )
         except Exception:
             conn.rollback()
