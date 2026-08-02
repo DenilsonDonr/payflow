@@ -64,3 +64,9 @@ class Payment:
                 f"Cannot move a payment from {self._state.value} to {to_state.value}."
             )
         self._state = to_state
+
+    @classmethod
+    def reconstitute(cls, id: uuid.UUID, amount: Money, state: PaymentState) -> "Payment":
+        payment = cls(id=id, amount=amount)
+        payment._state = state
+        return payment
