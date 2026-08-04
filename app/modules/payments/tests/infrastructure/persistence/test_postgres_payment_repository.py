@@ -75,3 +75,26 @@ class TestPostgresPaymentRepository:
         assert retrieved_payment.amount.amount == payment.amount.amount
         assert retrieved_payment.amount.currency == payment.amount.currency
         assert retrieved_payment.state == PaymentState.COMPLETED
+
+    def test_update_payment_persists_the_new_state(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+        repo, fixed_id = payment_repository
+        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
+        repo.create_payment(payment=payment)
+
+        assert payment.state == PaymentState.PENDING
+
+        payment.approve()
+        repo.update_payment(payment=payment)
+
+        retrieved_payment = repo.get_payment_by_id(payment_id=fixed_id)
+
+        assert retrieved_payment is not None
+        assert retrieved_payment.state == PaymentState.APPROVED
+
+    def test_update_payment_raises_for_a_nonexistent_payment(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+        repo, fixed_id = payment_repository
+        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
+        # The payment is never persisted, so the UPDATE would otherwise affect zero rows silently.
+
+        with pytest.raises(ValueError, match="not found"):
+            repo.update_payment(payment=payment)
