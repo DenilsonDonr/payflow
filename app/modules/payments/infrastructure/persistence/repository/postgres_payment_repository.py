@@ -58,4 +58,18 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
             raise
 
     def update_payment(self, payment: Payment) -> None:
-        raise NotImplementedError("This method is not yet implemented.")
+        conn = self.connection.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE payments SET state = %s WHERE id = %s",
+                    (payment.state.value, str(payment.id))
+                )
+
+                if cursor.rowcount == 0:
+                    raise ValueError(f"Payment with ID {payment.id} not found.")
+
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
