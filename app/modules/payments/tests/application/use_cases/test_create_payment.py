@@ -15,6 +15,9 @@ class FailingPaymentRepository(PaymentRepositoryPort):
     def create_payment(self, payment: Payment) -> Payment:
         raise RuntimeError("Simulated persistence failure.")
 
+    def update_payment(self, payment: Payment) -> None:
+        raise NotImplementedError("This test double does not support update_payment.")
+
 class TestPaymentCreate:
     def test_returns_payment_when_creation_succeeds(self):
         payment_repository = InMemoryPaymentRepository()

@@ -56,3 +56,6 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         except Exception:
             conn.rollback()
             raise
+
+    def update_payment(self, payment: Payment) -> None:
+        raise NotImplementedError("This method is not yet implemented.")

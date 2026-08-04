@@ -29,6 +29,9 @@ class DuplicatePaymentRepository(PaymentRepositoryPort):
     def create_payment(self, payment: Payment) -> Payment:
         raise PaymentAlreadyExistsError(f"Payment with ID {payment.id} already exists.")
 
+    def update_payment(self, payment: Payment) -> None:
+        raise NotImplementedError("This test double does not support update_payment.")
+
 
 def test_create_payment_endpoint():
     app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())

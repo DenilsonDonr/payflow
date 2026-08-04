@@ -10,3 +10,7 @@ class PaymentRepositoryPort(ABC):
     @abstractmethod
     def create_payment(self, payment: Payment) -> Payment:
         pass
+
+    @abstractmethod
+    def update_payment(self, payment: Payment) -> None:
+        pass
