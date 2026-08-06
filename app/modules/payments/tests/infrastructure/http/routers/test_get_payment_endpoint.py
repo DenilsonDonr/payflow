@@ -4,9 +4,9 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
+from app.modules.payments.application.use_cases.get_payment_use_case import GetPaymentUseCase
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.value_objects.money import Money
-from app.modules.payments.application.use_cases.get_payment_use_case import GetPaymentUseCase
 from app.modules.payments.infrastructure.http.routers.payment_router import get_get_payment_use_case
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
 from main import app

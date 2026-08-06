@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, field_validator
 
+
 class PaymentCreateRequest(BaseModel):
     amount: Decimal
     currency: str

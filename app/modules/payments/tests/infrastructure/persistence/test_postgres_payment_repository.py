@@ -1,13 +1,15 @@
-from decimal import Decimal
 import uuid
+from decimal import Decimal
 
 import pytest
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
-from app.modules.payments.domain.value_objects.money import Money
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
+from app.modules.payments.domain.value_objects.money import Money
 from app.modules.payments.infrastructure.persistence.postgres_connection import ConnectionDB
-from app.modules.payments.infrastructure.persistence.repository.postgres_payment_repository import PostgresPaymentRepository
+from app.modules.payments.infrastructure.persistence.repository.postgres_payment_repository import (
+    PostgresPaymentRepository,
+)
 
 pytestmark = pytest.mark.integration
 

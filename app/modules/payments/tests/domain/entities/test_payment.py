@@ -4,7 +4,9 @@ from decimal import Decimal
 import pytest
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
-from app.modules.payments.domain.exceptions.invalid_payment_transition import (InvalidPaymentTransitionError)
+from app.modules.payments.domain.exceptions.invalid_payment_transition import (
+    InvalidPaymentTransitionError,
+)
 from app.modules.payments.domain.value_objects.money import Money
 
 DEFAULT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")

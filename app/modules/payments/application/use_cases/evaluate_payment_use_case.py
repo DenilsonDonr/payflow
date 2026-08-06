@@ -1,9 +1,10 @@
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.domain.value_objects.verdict import Verdict
+
 
 class EvaluatePaymentUseCase:
     def __init__(self, payment_repository_port: PaymentRepositoryPort):

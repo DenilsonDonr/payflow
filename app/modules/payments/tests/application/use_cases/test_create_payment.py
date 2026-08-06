@@ -1,12 +1,13 @@
-from decimal import Decimal
 import uuid
+from decimal import Decimal
 
 import pytest
 
+from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
-from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
+
 
 class FailingPaymentRepository(PaymentRepositoryPort):
     def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:

@@ -1,6 +1,7 @@
+import os
+
 import psycopg
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ class ConnectionDB:
             f"dbname={database} user={user} password={password} host={host} port={port}"
         )
         return self.conn
-    
+
     def get_connection(self) -> psycopg.Connection:
         if self.conn is None:
             return self.connect()
@@ -30,7 +31,7 @@ class ConnectionDB:
             return self.connect()
 
         return self.conn
-    
+
     def close(self) -> bool:
         if self.conn:
             self.conn.close()

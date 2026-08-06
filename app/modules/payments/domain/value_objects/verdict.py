@@ -2,6 +2,7 @@ from enum import Enum
 
 from app.modules.payments.domain.exceptions.invalid_verdict import InvalidVerdictError
 
+
 class Verdict(Enum):
     APPROVED = 'approved'
     REJECTED = 'rejected'
