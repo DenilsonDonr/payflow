@@ -1,8 +1,11 @@
 import uuid
 from enum import Enum
 
-from app.modules.payments.domain.exceptions.invalid_payment_transition import (InvalidPaymentTransitionError)
+from app.modules.payments.domain.exceptions.invalid_payment_transition import (
+    InvalidPaymentTransitionError,
+)
 from app.modules.payments.domain.value_objects.money import Money
+
 
 class PaymentState(Enum):
     PENDING = 'pending'

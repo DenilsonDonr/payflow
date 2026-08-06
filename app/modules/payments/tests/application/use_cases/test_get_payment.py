@@ -1,9 +1,10 @@
 import uuid
 
-from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.application.use_cases.get_payment_use_case import GetPaymentUseCase
-from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
+from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.tests.domain.entities.test_payment import make_payment
+from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
+
 
 class TestPaymentGet:
     def test_returns_payment_when_it_exists(self):

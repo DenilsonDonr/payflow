@@ -28,17 +28,17 @@ class TestConnectionDB:
 
     def test_reconnects_if_connection_is_closed(self, connection_db: ConnectionDB):
         conn = connection_db.get_connection()
-        
+
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1")
             assert cursor.fetchone() == (1,)
-            
+
         # close connection
         conn.close()
-        
+
         # get connection again
         conn = connection_db.get_connection()
-        
+
         with conn.cursor() as cursor:
             cursor.execute("SELECT 1")
             assert cursor.fetchone() == (1,)

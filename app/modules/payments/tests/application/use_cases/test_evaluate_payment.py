@@ -3,10 +3,12 @@ from decimal import Decimal
 
 import pytest
 
+from app.modules.payments.application.use_cases.evaluate_payment_use_case import (
+    EvaluatePaymentUseCase,
+)
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
 from app.modules.payments.domain.exceptions.invalid_verdict import InvalidVerdictError
 from app.modules.payments.domain.value_objects.money import Money
-from app.modules.payments.application.use_cases.evaluate_payment_use_case import EvaluatePaymentUseCase
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
 
 
@@ -69,5 +71,5 @@ class TestPaymentEvaluate:
 
         evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
 
-        with pytest.raises(ValueError, match="Payment with ID .* not found."):
+        with pytest.raises(ValueError, match=r"Payment with ID .* not found."):
             evaluate_payment_use_case.execute(payment_id=uuid.uuid4(), verdict="approved")

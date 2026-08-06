@@ -1,9 +1,10 @@
 import uuid
 from decimal import Decimal
 
-from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.domain.entities.payment import Payment
+from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.domain.value_objects.money import Money
+
 
 class CreatePaymentUseCase:
     def __init__(self, payment_repository_port: PaymentRepositoryPort):

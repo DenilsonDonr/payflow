@@ -4,14 +4,16 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
-from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
+from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
-from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
-from app.modules.payments.infrastructure.http.routers.payment_router import get_create_payment_use_case
+from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
+from app.modules.payments.infrastructure.http.routers.payment_router import (
+    get_create_payment_use_case,
+)
 from app.modules.payments.infrastructure.http.schemas.payment_schemas import PaymentCreateRequest
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
+from main import app
 
 client = TestClient(app)
 
