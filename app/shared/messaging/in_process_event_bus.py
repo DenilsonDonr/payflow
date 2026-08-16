@@ -1,8 +1,10 @@
 from collections.abc import Callable
 from typing import Any
 
+from app.shared.messaging.event_bus import EventBus
 
-class InProcessEventBus:
+
+class InProcessEventBus(EventBus):
     def __init__(self) -> None:
         self._handlers: dict[type[Any], list[Callable[[Any], None]]] = {}
 
