@@ -10,13 +10,11 @@ from app.modules.payments.domain.entities.payment import PaymentState
 from app.modules.payments.infrastructure.messaging.evaluate_payment_subscriber import (
     EvaluatePaymentSubscriber,
 )
-from app.modules.payments.infrastructure.messaging.payment_verdict_message import (
-    PaymentVerdictMessage,
-)
 from app.modules.payments.infrastructure.persistence.postgres_connection import ConnectionDB
 from app.modules.payments.infrastructure.persistence.repository.postgres_payment_repository import (
     PostgresPaymentRepository,
 )
+from app.shared.messaging.contracts.payment_verdict_message import PaymentVerdictMessage
 from app.shared.messaging.in_process_event_bus import InProcessEventBus
 from main import app
 

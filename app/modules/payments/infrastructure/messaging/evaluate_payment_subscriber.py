@@ -1,9 +1,7 @@
 from app.modules.payments.application.use_cases.evaluate_payment_use_case import (
     EvaluatePaymentUseCase,
 )
-from app.modules.payments.infrastructure.messaging.payment_verdict_message import (
-    PaymentVerdictMessage,
-)
+from app.shared.messaging.contracts.payment_verdict_message import PaymentVerdictMessage
 
 
 class EvaluatePaymentSubscriber:
