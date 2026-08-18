@@ -9,10 +9,8 @@ from app.modules.payments.domain.value_objects.money import Money
 from app.modules.payments.infrastructure.messaging.evaluate_payment_subscriber import (
     EvaluatePaymentSubscriber,
 )
-from app.modules.payments.infrastructure.messaging.payment_verdict_message import (
-    PaymentVerdictMessage,
-)
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
+from app.shared.messaging.contracts.payment_verdict_message import PaymentVerdictMessage
 
 
 class TestEvaluatePaymentSubscriber:

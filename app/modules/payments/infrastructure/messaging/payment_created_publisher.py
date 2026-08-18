@@ -1,7 +1,5 @@
 from app.modules.payments.domain.entities.payment import Payment
-from app.modules.payments.infrastructure.messaging.payment_created_message import (
-    PaymentCreatedMessage,
-)
+from app.shared.messaging.contracts.payment_created_message import PaymentCreatedMessage
 from app.shared.messaging.event_bus import EventBus
 
 
