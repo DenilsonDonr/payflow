@@ -1,5 +1,8 @@
+import logging
 import uuid
 from decimal import Decimal
+
+import pytest
 
 from app.modules.payments.application.use_cases.evaluate_payment_use_case import (
     EvaluatePaymentUseCase,
@@ -47,3 +50,25 @@ class TestEvaluatePaymentSubscriber:
 
         assert updated_payment is not None
         assert updated_payment.state == PaymentState.REJECTED
+
+    def test_unrecognized_verdict_leaves_payment_pending_and_logs(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        payment_repository = InMemoryPaymentRepository()
+
+        payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
+        payment_repository.add(payment)
+
+        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        subscriber = EvaluatePaymentSubscriber(evaluate_payment_use_case=evaluate_payment_use_case)
+
+        message = PaymentVerdictMessage(payment_id=payment.id, verdict="not_a_verdict")
+
+        with caplog.at_level(logging.WARNING):
+            subscriber.handle(message)
+
+        updated_payment = payment_repository.get_payment_by_id(payment.id)
+
+        assert updated_payment is not None
+        assert updated_payment.state == PaymentState.PENDING
+        assert "not_a_verdict" in caplog.text
