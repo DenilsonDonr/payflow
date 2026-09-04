@@ -10,12 +10,26 @@ from app.modules.payments.domain.exceptions.payment_already_exists import Paymen
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.infrastructure.http.routers.payment_router import (
     get_create_payment_use_case,
+    get_payment_created_publisher,
 )
 from app.modules.payments.infrastructure.http.schemas.payment_schemas import PaymentCreateRequest
+from app.modules.payments.infrastructure.messaging.payment_created_publisher import (
+    PaymentCreatedPublisher,
+)
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
+from app.shared.messaging.in_process_event_bus import InProcessEventBus
 from main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolated_event_bus():
+    # A bus of its own, with nobody subscribed: these tests exercise the endpoint, not the
+    # wiring. On the application bus the POST would run fraud and reach the real database.
+    app.dependency_overrides[get_payment_created_publisher] = lambda: PaymentCreatedPublisher(
+        event_bus=InProcessEventBus()
+    )
 
 
 @pytest.fixture(autouse=True)
