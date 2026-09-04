@@ -10,38 +10,37 @@ from app.modules.payments.infrastructure.persistence.postgres_connection import 
 
 
 class PostgresPaymentRepository(PaymentRepositoryPort):
+    """Every method borrows a connection for its own transaction and gives it back.
+
+    Leaving the `async with` commits, or rolls back if the block raised, so neither is written here.
+    """
+
     def __init__(self, connection: ConnectionDB):
         self.connection = connection
 
-    def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
-        conn = self.connection.get_connection()
+    async def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
+        async with self.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT id, amount, currency, state FROM payments WHERE id = %s",
+                (str(payment_id),)
+            )
+            row = await cursor.fetchone()
+
+            if row is None:
+                return None
+
+            row_id, amount, currency, state = row
+
+            return Payment.reconstitute(
+                id=uuid.UUID(row_id),
+                amount=Money(amount=amount, currency=currency),
+                state=PaymentState(state)
+            )
+
+    async def create_payment(self, payment: Payment) -> Payment:
         try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT id, amount, currency, state FROM payments WHERE id = %s",
-                    (str(payment_id),)
-                )
-                row = cursor.fetchone()
-
-                if row is None:
-                    return None
-
-                row_id, amount, currency, state = row
-
-                return Payment.reconstitute(
-                    id=uuid.UUID(row_id),
-                    amount=Money(amount=amount, currency=currency),
-                    state=PaymentState(state)
-                )
-        except Exception:
-            conn.rollback()
-            raise
-
-    def create_payment(self, payment: Payment) -> Payment:
-        conn = self.connection.get_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
+            async with self.connection.connection() as conn, conn.cursor() as cursor:
+                await cursor.execute(
                     "INSERT INTO payments (id, amount, currency, state) VALUES (%s, %s, %s, %s)",
                     (
                         payment.id,
@@ -51,33 +50,20 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
                     ),
                 )
 
-                conn.commit()
-
                 return payment
         except psycopg.IntegrityError as e:
-            conn.rollback()
             if e.sqlstate == '23505':  # Unique violation error code
                 raise PaymentAlreadyExistsError(
                     f"Payment with ID {payment.id} already exists."
                 ) from e
             raise
-        except Exception:
-            conn.rollback()
-            raise
 
-    def update_payment(self, payment: Payment) -> None:
-        conn = self.connection.get_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE payments SET state = %s WHERE id = %s",
-                    (payment.state.value, str(payment.id))
-                )
+    async def update_payment(self, payment: Payment) -> None:
+        async with self.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(
+                "UPDATE payments SET state = %s WHERE id = %s",
+                (payment.state.value, str(payment.id))
+            )
 
-                if cursor.rowcount == 0:
-                    raise ValueError(f"Payment with ID {payment.id} not found.")
-
-                conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
+            if cursor.rowcount == 0:
+                raise ValueError(f"Payment with ID {payment.id} not found.")

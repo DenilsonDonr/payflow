@@ -15,13 +15,13 @@ class EvaluatePaymentUseCase:
             Verdict.REJECTED: Payment.reject,
         }
 
-    def execute(self, payment_id: uuid.UUID, verdict: str):
+    async def execute(self, payment_id: uuid.UUID, verdict: str) -> None:
         parsed_verdict = Verdict(verdict)
 
-        payment = self.payment_repository_port.get_payment_by_id(payment_id)
+        payment = await self.payment_repository_port.get_payment_by_id(payment_id)
         if payment is None:
             raise ValueError(f"Payment with ID {payment_id} not found.")
 
         self.verdict_actions[parsed_verdict](payment)
 
-        self.payment_repository_port.update_payment(payment)
+        await self.payment_repository_port.update_payment(payment)

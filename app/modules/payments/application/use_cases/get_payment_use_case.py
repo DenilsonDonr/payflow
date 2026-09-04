@@ -8,5 +8,5 @@ class GetPaymentUseCase:
     def __init__(self, payment_repository_port: PaymentRepositoryPort):
         self.payment_repository_port = payment_repository_port
 
-    def execute(self, payment_id: uuid.UUID) -> Payment | None:
-        return self.payment_repository_port.get_payment_by_id(payment_id)
+    async def execute(self, payment_id: uuid.UUID) -> Payment | None:
+        return await self.payment_repository_port.get_payment_by_id(payment_id)
