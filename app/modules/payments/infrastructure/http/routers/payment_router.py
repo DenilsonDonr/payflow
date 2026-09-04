@@ -31,12 +31,12 @@ router_payment = APIRouter()
     status_code=201,
     response_model=PaymentResponse,
 )
-def create_payment(
+async def create_payment(
     request: PaymentCreateRequest,
     use_case: CreatePaymentUseCase = Depends(get_create_payment_use_case),
 ):
     try:
-        created_payment = use_case.execute(amount=request.amount, currency=request.currency)
+        created_payment = await use_case.execute(amount=request.amount, currency=request.currency)
         # Nothing evaluates the payment yet: it is returned PENDING and stays there until a
         # consumer picks it up. That consumer is Kafka's job, not this handler's.
         return PaymentResponse(
@@ -53,11 +53,11 @@ def create_payment(
     summary="Get a payment by ID",
     response_model=PaymentResponse,
 )
-def get_payment(
+async def get_payment(
     payment_id: uuid.UUID,
     use_case: GetPaymentUseCase = Depends(get_get_payment_use_case),
 ):
-    payment = use_case.execute(payment_id=payment_id)
+    payment = await use_case.execute(payment_id=payment_id)
     if payment is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     return PaymentResponse(

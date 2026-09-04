@@ -7,7 +7,7 @@ from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemo
 
 
 class TestPaymentGet:
-    def test_returns_payment_when_it_exists(self):
+    async def test_returns_payment_when_it_exists(self):
         # instance memory payment
         payment_repository = InMemoryPaymentRepository()
 
@@ -22,13 +22,13 @@ class TestPaymentGet:
 
         # Test getting an existing payment
         payment_id = payment_ids[2]
-        payment = get_payment_use_case.execute(payment_id)
+        payment = await get_payment_use_case.execute(payment_id)
 
         assert isinstance(payment, Payment)
         assert payment is not None
         assert payment.id == payment_id
 
-    def test_returns_none_when_payment_does_not_exist(self):
+    async def test_returns_none_when_payment_does_not_exist(self):
         # instance memory payment
         payment_repository = InMemoryPaymentRepository()
 
@@ -42,7 +42,7 @@ class TestPaymentGet:
 
         # Test getting a non-existing payment
         payment_id = uuid.uuid4()
-        payment = get_payment_use_case.execute(payment_id)
+        payment = await get_payment_use_case.execute(payment_id)
 
         assert not isinstance(payment, Payment)
         assert payment is None

@@ -3,14 +3,12 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
-
-client = TestClient(app)
-
 pytestmark = pytest.mark.integration
 
 
-def test_create_payment_endpoint_e2e(payment_cleanup: dict[str, uuid.UUID | None]):
+def test_create_payment_endpoint_e2e(
+    client: TestClient, payment_cleanup: dict[str, uuid.UUID | None]
+):
     created_payment = payment_cleanup
 
     data_request = {

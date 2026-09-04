@@ -1,14 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
-
-client = TestClient(app)
-
 pytestmark = pytest.mark.integration
 
 
-def test_get_payment_endpoint_e2e(payment_cleanup: dict[str, str | None]):
+def test_get_payment_endpoint_e2e(client: TestClient, payment_cleanup: dict[str, str | None]):
     created_payment = payment_cleanup
 
     create_data_request = {

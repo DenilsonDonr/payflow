@@ -25,13 +25,13 @@ def clear_overrides():
 
 
 class DuplicatePaymentRepository(PaymentRepositoryPort):
-    def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
+    async def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
         raise NotImplementedError
 
-    def create_payment(self, payment: Payment) -> Payment:
+    async def create_payment(self, payment: Payment) -> Payment:
         raise PaymentAlreadyExistsError(f"Payment with ID {payment.id} already exists.")
 
-    def update_payment(self, payment: Payment) -> None:
+    async def update_payment(self, payment: Payment) -> None:
         raise NotImplementedError("This test double does not support update_payment.")
 
 
