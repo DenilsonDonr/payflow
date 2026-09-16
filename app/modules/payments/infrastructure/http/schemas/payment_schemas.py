@@ -8,6 +8,13 @@ class PaymentCreateRequest(BaseModel):
     amount: Decimal
     currency: str
 
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise ValueError("Amount must be greater than zero.")
+        return value
+
     @field_validator("currency")
     @classmethod
     def validate_currency(cls, value: str) -> str:
