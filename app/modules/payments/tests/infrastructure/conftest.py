@@ -1,23 +1,9 @@
 import psycopg
 import pytest
-from fastapi.testclient import TestClient
 
 from app.shared.persistence.postgres_connection import CONNINFO
-from main import app
 
 POSTGRES_DOWN = "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
-
-
-@pytest.fixture(scope="session")
-def client():
-    """One client for the whole session, entered as a context manager on purpose.
-
-    Outside one, TestClient spins a fresh event loop per request; the app's async pool, opened on
-    the first request, would then belong to a loop that is already gone by the second. The context
-    manager also runs the lifespan, so the pool opens and closes where the app says it should.
-    """
-    with TestClient(app) as test_client:
-        yield test_client
 
 
 @pytest.fixture
