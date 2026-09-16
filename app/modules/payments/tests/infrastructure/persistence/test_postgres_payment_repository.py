@@ -9,12 +9,12 @@ from psycopg_pool import AsyncConnectionPool, PoolTimeout
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
 from app.modules.payments.domain.value_objects.money import Money
-from app.modules.payments.infrastructure.persistence.postgres_connection import (
-    CONNINFO,
-    ConnectionDB,
-)
 from app.modules.payments.infrastructure.persistence.repository.postgres_payment_repository import (
     PostgresPaymentRepository,
+)
+from app.shared.persistence.postgres_connection import (
+    CONNINFO,
+    ConnectionDB,
 )
 
 pytestmark = pytest.mark.integration

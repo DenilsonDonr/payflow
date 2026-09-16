@@ -3,7 +3,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
 from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
-from app.modules.payments.infrastructure.persistence.postgres_connection import (
+from app.shared.persistence.postgres_connection import (
     CONNINFO,
     ConnectionDB,
 )

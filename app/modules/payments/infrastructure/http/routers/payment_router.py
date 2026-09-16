@@ -9,10 +9,10 @@ from app.modules.payments.infrastructure.http.schemas.payment_schemas import (
     PaymentCreateRequest,
     PaymentResponse,
 )
-from app.modules.payments.infrastructure.persistence.postgres_connection import ConnectionDB
 from app.modules.payments.infrastructure.persistence.repository.postgres_payment_repository import (
     PostgresPaymentRepository,
 )
+from app.shared.persistence.postgres_connection import ConnectionDB
 
 
 def get_create_payment_use_case() -> CreatePaymentUseCase:
