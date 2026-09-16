@@ -56,6 +56,15 @@ def test_create_payment_endpoint_invalid_currency():
 
     assert response.status_code == 422
 
+@pytest.mark.parametrize("amount", ["0", "0.00", "-5.00"])
+def test_create_payment_endpoint_non_positive_amount(amount: str):
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())
+
+    # Raw JSON for the same reason as the invalid currency case: FastAPI must validate the body.
+    response = client.post("/api/v1/payments", json={"amount": amount, "currency": "USD"})
+
+    assert response.status_code == 422
+
 def test_create_payment_endpoint_duplicate_error():
     app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=DuplicatePaymentRepository())
 
