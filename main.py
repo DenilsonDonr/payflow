@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.modules.payments.infrastructure.http.routers.payment_router import router_payment
-from app.modules.payments.infrastructure.persistence.postgres_connection import (
+from app.shared.persistence.postgres_connection import (
     close_pool,
     open_pool,
 )

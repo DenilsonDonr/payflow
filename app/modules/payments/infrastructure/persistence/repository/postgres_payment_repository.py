@@ -6,7 +6,7 @@ from app.modules.payments.domain.entities.payment import Payment, PaymentState
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.domain.value_objects.money import Money
-from app.modules.payments.infrastructure.persistence.postgres_connection import ConnectionDB
+from app.shared.persistence.postgres_connection import ConnectionDB
 
 
 class PostgresPaymentRepository(PaymentRepositoryPort):

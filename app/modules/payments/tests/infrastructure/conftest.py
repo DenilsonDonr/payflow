@@ -2,7 +2,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app.modules.payments.infrastructure.persistence.postgres_connection import CONNINFO
+from app.shared.persistence.postgres_connection import CONNINFO
 from main import app
 
 POSTGRES_DOWN = "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
