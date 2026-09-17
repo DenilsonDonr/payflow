@@ -26,7 +26,9 @@ class TestRegisterUser:
     async def test_stores_the_registered_user(self):
         repository = InMemoryUserRepository()
 
-        user = await make_use_case(repository=repository).execute(email="ana@x.com", password=PASSWORD)
+        user = await make_use_case(repository=repository).execute(
+            email="ana@x.com", password=PASSWORD
+        )
 
         assert repository.get_by_email(Email("ana@x.com")) == user
 

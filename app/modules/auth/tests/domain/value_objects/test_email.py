@@ -65,7 +65,7 @@ class TestEmailValidation:
 
     @pytest.mark.parametrize("raw", ["ana@", "ana@localhost", "ana@.com", "ana@x.com."])
     def test_rejects_domain_without_a_dotted_name(self, raw: str):
-        """"ana@localhost" is valid by RFC but rejected on purpose: a real user never signs up
+        """ "ana@localhost" is valid by RFC but rejected on purpose: a real user never signs up
         with a host that has no public domain."""
         with pytest.raises(ValueError, match="domain must look like"):
             Email(raw)

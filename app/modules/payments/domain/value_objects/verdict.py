@@ -4,8 +4,8 @@ from app.modules.payments.domain.exceptions.invalid_verdict import InvalidVerdic
 
 
 class Verdict(Enum):
-    APPROVED = 'approved'
-    REJECTED = 'rejected'
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
     @classmethod
     def _missing_(cls, value: object):

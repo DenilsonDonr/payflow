@@ -34,7 +34,9 @@ async def payment_repository():
         await pool.open(wait=True, timeout=3)
     except PoolTimeout:
         await pool.close()
-        pytest.skip("PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests.")
+        pytest.skip(
+            "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
+        )
 
     repo = PostgresPaymentRepository(connection=db_connection)
 
@@ -48,13 +50,21 @@ async def payment_repository():
 
 
 class TestPostgresPaymentRepository:
-    async def test_create_payment_raises_when_id_already_exists(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_create_payment_raises_when_id_already_exists(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
-        await repo.create_payment(payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD")))
+        await repo.create_payment(
+            payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD"))
+        )
         with pytest.raises(PaymentAlreadyExistsError):
-            await repo.create_payment(payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD")))
+            await repo.create_payment(
+                payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD"))
+            )
 
-    async def test_create_payment_and_retrieve_payment(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_create_payment_and_retrieve_payment(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
         payment = Payment(id=fixed_id, amount=Money(amount=Decimal("150.00"), currency="USD"))
         await repo.create_payment(payment=payment)
@@ -66,14 +76,20 @@ class TestPostgresPaymentRepository:
         assert retrieved_payment.amount.amount == payment.amount.amount
         assert retrieved_payment.amount.currency == payment.amount.currency
 
-    async def test_get_payment_by_id_returns_none_for_nonexistent_payment(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_get_payment_by_id_returns_none_for_nonexistent_payment(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
 
-        retrieved_payment = await repo.get_payment_by_id(payment_id=fixed_id)  # Using the fixed_id which has not been created in this test
+        retrieved_payment = await repo.get_payment_by_id(
+            payment_id=fixed_id
+        )  # Using the fixed_id which has not been created in this test
 
         assert retrieved_payment is None
 
-    async def test_retrieved_payment_preserves_its_persisted_state(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_retrieved_payment_preserves_its_persisted_state(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
         payment = Payment(id=fixed_id, amount=Money(amount=Decimal("200.00"), currency="USD"))
         payment.approve()
@@ -88,7 +104,9 @@ class TestPostgresPaymentRepository:
         assert retrieved_payment.amount.currency == payment.amount.currency
         assert retrieved_payment.state == PaymentState.COMPLETED
 
-    async def test_update_payment_persists_the_new_state(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_update_payment_persists_the_new_state(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
         payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
         await repo.create_payment(payment=payment)
@@ -103,7 +121,9 @@ class TestPostgresPaymentRepository:
         assert retrieved_payment is not None
         assert retrieved_payment.state == PaymentState.APPROVED
 
-    async def test_update_payment_raises_for_a_nonexistent_payment(self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]):
+    async def test_update_payment_raises_for_a_nonexistent_payment(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
         repo, fixed_id = payment_repository
         payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
         # The payment is never persisted, so the UPDATE would otherwise affect zero rows silently.

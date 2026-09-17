@@ -8,18 +8,19 @@ from app.modules.payments.domain.value_objects.money import Money
 
 
 class PaymentState(Enum):
-    PENDING = 'pending'
-    APPROVED = 'approved'
-    COMPLETED = 'completed'
-    REJECTED = 'rejected'
-    FAILED = 'failed'
+    PENDING = "pending"
+    APPROVED = "approved"
+    COMPLETED = "completed"
+    REJECTED = "rejected"
+    FAILED = "failed"
+
 
 class Payment:
     def __init__(self, id: uuid.UUID, amount: Money):
         # Type hints are not enforced at runtime, so callers can pass any type.
-        if not isinstance(id, uuid.UUID): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(id, uuid.UUID):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Payment ID must be a UUID.")
-        if not isinstance(amount, Money): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(amount, Money):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Payment amount must be an instance of Money.")
 
         self._id = id

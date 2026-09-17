@@ -21,8 +21,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
     async def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
         async with self.connection.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(
-                "SELECT id, amount, currency, state FROM payments WHERE id = %s",
-                (str(payment_id),)
+                "SELECT id, amount, currency, state FROM payments WHERE id = %s", (str(payment_id),)
             )
             row = await cursor.fetchone()
 
@@ -34,7 +33,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
             return Payment.reconstitute(
                 id=uuid.UUID(row_id),
                 amount=Money(amount=amount, currency=currency),
-                state=PaymentState(state)
+                state=PaymentState(state),
             )
 
     async def create_payment(self, payment: Payment) -> Payment:
@@ -52,7 +51,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
 
                 return payment
         except psycopg.IntegrityError as e:
-            if e.sqlstate == '23505':  # Unique violation error code
+            if e.sqlstate == "23505":  # Unique violation error code
                 raise PaymentAlreadyExistsError(
                     f"Payment with ID {payment.id} already exists."
                 ) from e
@@ -62,7 +61,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         async with self.connection.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(
                 "UPDATE payments SET state = %s WHERE id = %s",
-                (payment.state.value, str(payment.id))
+                (payment.state.value, str(payment.id)),
             )
 
             if cursor.rowcount == 0:

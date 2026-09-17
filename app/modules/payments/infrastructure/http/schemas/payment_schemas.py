@@ -22,6 +22,7 @@ class PaymentCreateRequest(BaseModel):
             raise ValueError("Currency must be a 3-letter ISO 4217 code.")
         return value
 
+
 class PaymentResponse(BaseModel):
     id: uuid.UUID
     amount: Decimal

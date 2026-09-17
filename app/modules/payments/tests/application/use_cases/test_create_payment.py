@@ -19,6 +19,7 @@ class FailingPaymentRepository(PaymentRepositoryPort):
     async def update_payment(self, payment: Payment) -> None:
         raise NotImplementedError("This test double does not support update_payment.")
 
+
 class TestPaymentCreate:
     async def test_returns_payment_when_creation_succeeds(self):
         payment_repository = InMemoryPaymentRepository()

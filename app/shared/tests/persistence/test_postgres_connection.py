@@ -22,7 +22,9 @@ async def single_connection_db():
         await pool.open(wait=True, timeout=3)
     except PoolTimeout:
         await pool.close()
-        pytest.skip("PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests.")
+        pytest.skip(
+            "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
+        )
 
     yield ConnectionDB(pool=pool)
 

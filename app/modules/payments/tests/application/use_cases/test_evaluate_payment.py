@@ -19,7 +19,9 @@ class TestPaymentEvaluate:
         payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
         payment_repository.add(payment)
 
-        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        evaluate_payment_use_case = EvaluatePaymentUseCase(
+            payment_repository_port=payment_repository
+        )
         await evaluate_payment_use_case.execute(payment_id=payment.id, verdict="approved")
 
         updated_payment = await payment_repository.get_payment_by_id(payment.id)
@@ -33,7 +35,9 @@ class TestPaymentEvaluate:
         payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
         payment_repository.add(payment)
 
-        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        evaluate_payment_use_case = EvaluatePaymentUseCase(
+            payment_repository_port=payment_repository
+        )
         await evaluate_payment_use_case.execute(payment_id=payment.id, verdict="rejected")
 
         updated_payment = await payment_repository.get_payment_by_id(payment.id)
@@ -47,7 +51,9 @@ class TestPaymentEvaluate:
         payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
         payment_repository.add(payment)
 
-        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        evaluate_payment_use_case = EvaluatePaymentUseCase(
+            payment_repository_port=payment_repository
+        )
         await evaluate_payment_use_case.execute(payment_id=payment.id, verdict="APPROVED")
 
         updated_payment = await payment_repository.get_payment_by_id(payment.id)
@@ -61,15 +67,21 @@ class TestPaymentEvaluate:
         payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
         payment_repository.add(payment)
 
-        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        evaluate_payment_use_case = EvaluatePaymentUseCase(
+            payment_repository_port=payment_repository
+        )
 
         with pytest.raises(InvalidVerdictError, match="Invalid verdict"):
-            await evaluate_payment_use_case.execute(payment_id=payment.id, verdict="invalid_verdict")
+            await evaluate_payment_use_case.execute(
+                payment_id=payment.id, verdict="invalid_verdict"
+            )
 
     async def test_payment_not_found_raises_exception(self):
         payment_repository = InMemoryPaymentRepository()
 
-        evaluate_payment_use_case = EvaluatePaymentUseCase(payment_repository_port=payment_repository)
+        evaluate_payment_use_case = EvaluatePaymentUseCase(
+            payment_repository_port=payment_repository
+        )
 
         with pytest.raises(ValueError, match=r"Payment with ID .* not found."):
             await evaluate_payment_use_case.execute(payment_id=uuid.uuid4(), verdict="approved")
