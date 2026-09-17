@@ -12,11 +12,14 @@ from app.modules.payments.domain.value_objects.money import Money
 DEFAULT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
+
 def money(amount: str = "100.00", currency: str = "USD") -> Money:
     return Money(amount=Decimal(amount), currency=currency)
 
+
 def make_payment(id: uuid.UUID = DEFAULT_ID, amount: Money | None = None) -> Payment:
     return Payment(id=id, amount=amount if amount is not None else money())
+
 
 def payment_in(state: PaymentState, amount: Money | None = None) -> Payment:
     """Drive a fresh payment into `state` through its legal transitions only."""
@@ -39,6 +42,7 @@ def payment_in(state: PaymentState, amount: Money | None = None) -> Payment:
         return payment
     raise AssertionError(f"unhandled state: {state}")
 
+
 ACTIONS = ("approve", "reject", "complete", "fail")
 
 LEGAL_TRANSITIONS = {
@@ -55,6 +59,7 @@ ILLEGAL_TRANSITIONS = [
     if (state, action) not in LEGAL_TRANSITIONS
 ]
 
+
 class TestPaymentCreation:
     def test_creates_payment_with_given_id_and_amount(self):
         payment = Payment(id=DEFAULT_ID, amount=money())
@@ -65,7 +70,9 @@ class TestPaymentCreation:
     def test_is_always_born_pending(self):
         assert make_payment().state == PaymentState.PENDING
 
-    @pytest.mark.parametrize("id", [None, 123, 1.5, True, [], "11111111-1111-1111-1111-111111111111"])
+    @pytest.mark.parametrize(
+        "id", [None, 123, 1.5, True, [], "11111111-1111-1111-1111-111111111111"]
+    )
     def test_rejects_non_uuid_id(self, id: object):
         with pytest.raises(TypeError, match="Payment ID must be a UUID"):
             Payment(id=id, amount=money())  # pyright: ignore[reportArgumentType]
@@ -80,9 +87,15 @@ class TestPaymentTransitions:
     @pytest.mark.parametrize(
         ("from_state", "action", "expected_state"),
         [
-            pytest.param(PaymentState.PENDING, "approve", PaymentState.APPROVED, id="pending->approved"),
-            pytest.param(PaymentState.PENDING, "reject", PaymentState.REJECTED, id="pending->rejected"),
-            pytest.param(PaymentState.APPROVED, "complete", PaymentState.COMPLETED, id="approved->completed"),
+            pytest.param(
+                PaymentState.PENDING, "approve", PaymentState.APPROVED, id="pending->approved"
+            ),
+            pytest.param(
+                PaymentState.PENDING, "reject", PaymentState.REJECTED, id="pending->rejected"
+            ),
+            pytest.param(
+                PaymentState.APPROVED, "complete", PaymentState.COMPLETED, id="approved->completed"
+            ),
             pytest.param(PaymentState.APPROVED, "fail", PaymentState.FAILED, id="approved->failed"),
         ],
     )
@@ -97,7 +110,10 @@ class TestPaymentTransitions:
 
     @pytest.mark.parametrize(
         ("from_state", "action"),
-        [pytest.param(state, action, id=f"{state.value}-cannot-{action}") for state, action in ILLEGAL_TRANSITIONS],
+        [
+            pytest.param(state, action, id=f"{state.value}-cannot-{action}")
+            for state, action in ILLEGAL_TRANSITIONS
+        ],
     )
     def test_rejects_illegal_transitions(self, from_state: PaymentState, action: str):
         payment = payment_in(from_state)
@@ -120,6 +136,7 @@ class TestPaymentTransitions:
         payment = Payment.reconstitute(DEFAULT_ID, money(), PaymentState.APPROVED)
 
         assert payment.state == PaymentState.APPROVED
+
 
 class TestPaymentImmutability:
     @pytest.mark.parametrize(

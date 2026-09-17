@@ -27,14 +27,14 @@ class User:
                 even though Python treats it as an `int`.
         """
         # Type hints are not enforced at runtime, so callers can pass any type.
-        if not isinstance(id, uuid.UUID): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(id, uuid.UUID):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("User ID must be a UUID.")
-        if not isinstance(email, Email): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(email, Email):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("User email must be an instance of Email.")
-        if not isinstance(password_hash, str): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(password_hash, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("User password hash must be a string.")
         # bool is a subclass of int, so True would otherwise pass as role 1.
-        if isinstance(role_id, bool) or not isinstance(role_id, int): # pyright: ignore[reportUnnecessaryIsInstance]
+        if isinstance(role_id, bool) or not isinstance(role_id, int):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("User role ID must be an integer.")
 
         self._id = id

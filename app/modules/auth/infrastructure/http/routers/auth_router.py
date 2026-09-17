@@ -24,7 +24,9 @@ def get_register_user_use_case() -> RegisterUserUseCase:
         password_hasher_port=Argon2PasswordHasher(),
     )
 
+
 router_auth = APIRouter()
+
 
 @router_auth.post(
     "/auth/register",

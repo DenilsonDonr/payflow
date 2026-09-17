@@ -1,4 +1,3 @@
-
 from decimal import Decimal
 
 from app.modules.fraud.domain.ports.fraud_policy_port import FraudPolicyPort

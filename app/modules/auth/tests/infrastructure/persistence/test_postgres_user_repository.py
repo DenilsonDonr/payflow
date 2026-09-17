@@ -44,7 +44,9 @@ async def user_repository():
         await pool.open(wait=True, timeout=3)
     except PoolTimeout:
         await pool.close()
-        pytest.skip("PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests.")
+        pytest.skip(
+            "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
+        )
 
     yield PostgresUserRepository(connection=db_connection), email
 
@@ -56,7 +58,9 @@ async def user_repository():
 
 
 class TestPostgresUserRepository:
-    async def test_create_user_persists_every_field(self, user_repository: tuple[PostgresUserRepository, str]):
+    async def test_create_user_persists_every_field(
+        self, user_repository: tuple[PostgresUserRepository, str]
+    ):
         repo, email = user_repository
         user = a_user(email)
 
@@ -74,7 +78,9 @@ class TestPostgresUserRepository:
                 CLIENT_ROLE_ID,
             )
 
-    async def test_create_user_raises_when_the_email_is_already_registered(self, user_repository: tuple[PostgresUserRepository, str]):
+    async def test_create_user_raises_when_the_email_is_already_registered(
+        self, user_repository: tuple[PostgresUserRepository, str]
+    ):
         repo, email = user_repository
         await repo.create_user(a_user(email))
 
@@ -82,7 +88,9 @@ class TestPostgresUserRepository:
         with pytest.raises(UserAlreadyExistsError):
             await repo.create_user(a_user(email))
 
-    async def test_create_user_raises_when_the_stored_email_differs_only_in_case(self, user_repository: tuple[PostgresUserRepository, str]):
+    async def test_create_user_raises_when_the_stored_email_differs_only_in_case(
+        self, user_repository: tuple[PostgresUserRepository, str]
+    ):
         repo, email = user_repository
 
         # Written past Email on purpose: the value object lowercases, so going through it could
@@ -97,7 +105,9 @@ class TestPostgresUserRepository:
         with pytest.raises(UserAlreadyExistsError):
             await repo.create_user(a_user(email))
 
-    async def test_create_user_does_not_report_a_duplicate_id_as_a_taken_email(self, user_repository: tuple[PostgresUserRepository, str]):
+    async def test_create_user_does_not_report_a_duplicate_id_as_a_taken_email(
+        self, user_repository: tuple[PostgresUserRepository, str]
+    ):
         repo, email = user_repository
         user = await repo.create_user(a_user(email))
 

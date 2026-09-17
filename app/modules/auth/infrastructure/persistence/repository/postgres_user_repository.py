@@ -41,8 +41,7 @@ class PostgresUserRepository(UserRepositoryPort):
         try:
             async with self.connection.connection() as conn, conn.cursor() as cursor:
                 await cursor.execute(
-                    "INSERT INTO users (id, email, password_hash, role_id) "
-                    "VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO users (id, email, password_hash, role_id) VALUES (%s, %s, %s, %s)",
                     (user.id, user.email.value, user.password_hash, user.role_id),
                 )
 

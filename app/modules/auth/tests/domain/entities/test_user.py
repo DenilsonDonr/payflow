@@ -10,6 +10,7 @@ OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 DEFAULT_EMAIL = Email("ana@x.com")
 PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdA$aGFzaA"
 
+
 def make_user(id: uuid.UUID = DEFAULT_ID, email: Email = DEFAULT_EMAIL) -> User:
     return User(id=id, email=email, password_hash=PASSWORD_HASH, role_id=1)
 
@@ -56,7 +57,9 @@ class TestUserIdentity:
         assert make_user(id=DEFAULT_ID) != make_user(id=OTHER_ID)
 
     def test_equal_users_share_hash(self):
-        assert hash(make_user(email=Email("ana@x.com"))) == hash(make_user(email=Email("other@x.com")))
+        assert hash(make_user(email=Email("ana@x.com"))) == hash(
+            make_user(email=Email("other@x.com"))
+        )
 
     def test_repr_does_not_expose_password_hash(self):
         """repr is what logs and tracebacks print, so the hash must never appear in it."""

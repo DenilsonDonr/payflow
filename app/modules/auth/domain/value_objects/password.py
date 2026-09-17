@@ -31,7 +31,7 @@ class Password:
             ValueError: If `value` is shorter than 15 or longer than 64 characters.
         """
         # Type hints are not enforced at runtime, so callers can pass any type.
-        if not isinstance(self.value, str): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(self.value, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Password must be a string.")
 
         if len(self.value) < MIN_LENGTH:

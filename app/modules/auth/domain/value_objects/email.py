@@ -27,12 +27,12 @@ class Email:
                 `local@domain.tld`.
         """
         # Type hints are not enforced at runtime, so callers can pass any type.
-        if not isinstance(self.value, str): # pyright: ignore[reportUnnecessaryIsInstance]
+        if not isinstance(self.value, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Email must be a string.")
 
         # Frozen dataclasses do not allow direct assignment to fields, so we use
         # object.__setattr__ to store the normalized address.
-        object.__setattr__(self, 'value', self.value.strip().lower())
+        object.__setattr__(self, "value", self.value.strip().lower())
 
         if not self.value:
             raise ValueError("Email must not be empty.")

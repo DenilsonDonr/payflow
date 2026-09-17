@@ -21,4 +21,6 @@ def test_create_payment_endpoint_e2e(
     assert response.status_code == 201
 
     created_id = response.json().get("id")
-    created_payment["payment_id"] = uuid.UUID(created_id)  # Store the id so the fixture cleans it up
+    created_payment["payment_id"] = uuid.UUID(
+        created_id
+    )  # Store the id so the fixture cleans it up

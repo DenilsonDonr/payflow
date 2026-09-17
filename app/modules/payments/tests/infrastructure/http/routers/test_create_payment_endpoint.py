@@ -36,19 +36,24 @@ class DuplicatePaymentRepository(PaymentRepositoryPort):
 
 
 def test_create_payment_endpoint():
-    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(
+        payment_repository_port=InMemoryPaymentRepository()
+    )
 
     data_request = PaymentCreateRequest(
         amount=Decimal("100.00"),
         currency="USD",
     )
 
-    response = client.post("/api/v1/payments", json=data_request.model_dump(mode='json'))
+    response = client.post("/api/v1/payments", json=data_request.model_dump(mode="json"))
 
     assert response.status_code == 201
 
+
 def test_create_payment_endpoint_invalid_currency():
-    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(
+        payment_repository_port=InMemoryPaymentRepository()
+    )
 
     # Send raw JSON so FastAPI parses and validates the body itself (returning 422);
     # building PaymentCreateRequest(...) here would instead fail inside the test.
@@ -56,24 +61,30 @@ def test_create_payment_endpoint_invalid_currency():
 
     assert response.status_code == 422
 
+
 @pytest.mark.parametrize("amount", ["0", "0.00", "-5.00"])
 def test_create_payment_endpoint_non_positive_amount(amount: str):
-    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=InMemoryPaymentRepository())
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(
+        payment_repository_port=InMemoryPaymentRepository()
+    )
 
     # Raw JSON for the same reason as the invalid currency case: FastAPI must validate the body.
     response = client.post("/api/v1/payments", json={"amount": amount, "currency": "USD"})
 
     assert response.status_code == 422
 
+
 def test_create_payment_endpoint_duplicate_error():
-    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(payment_repository_port=DuplicatePaymentRepository())
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(
+        payment_repository_port=DuplicatePaymentRepository()
+    )
 
     data_request = PaymentCreateRequest(
         amount=Decimal("100.00"),
         currency="USD",
     )
 
-    response = client.post("/api/v1/payments", json=data_request.model_dump(mode='json'))
+    response = client.post("/api/v1/payments", json=data_request.model_dump(mode="json"))
 
     assert response.status_code == 409
     assert "already exists" in response.json()["detail"]

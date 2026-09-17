@@ -19,11 +19,14 @@ def get_create_payment_use_case() -> CreatePaymentUseCase:
     repository = PostgresPaymentRepository(connection=ConnectionDB())
     return CreatePaymentUseCase(payment_repository_port=repository)
 
+
 def get_get_payment_use_case() -> GetPaymentUseCase:
     repository = PostgresPaymentRepository(connection=ConnectionDB())
     return GetPaymentUseCase(payment_repository_port=repository)
 
+
 router_payment = APIRouter()
+
 
 @router_payment.post(
     "/payments",
@@ -47,6 +50,7 @@ async def create_payment(
         )
     except PaymentAlreadyExistsError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+
 
 @router_payment.get(
     "/payments/{payment_id}",
