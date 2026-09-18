@@ -16,14 +16,18 @@ class PaymentState(Enum):
 
 
 class Payment:
-    def __init__(self, id: uuid.UUID, amount: Money):
+    def __init__(self, id: uuid.UUID, user_id: uuid.UUID, amount: Money):
         # Type hints are not enforced at runtime, so callers can pass any type.
         if not isinstance(id, uuid.UUID):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Payment ID must be a UUID.")
+        # Only the identifier: the payments module never depends on the auth module's User.
+        if not isinstance(user_id, uuid.UUID):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise TypeError("Payment user ID must be a UUID.")
         if not isinstance(amount, Money):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError("Payment amount must be an instance of Money.")
 
         self._id = id
+        self._user_id = user_id
         self._state = PaymentState.PENDING
         self._amount = amount
 
@@ -41,6 +45,10 @@ class Payment:
     @property
     def id(self) -> uuid.UUID:
         return self._id
+
+    @property
+    def user_id(self) -> uuid.UUID:
+        return self._user_id
 
     @property
     def state(self) -> PaymentState:
@@ -70,7 +78,9 @@ class Payment:
         self._state = to_state
 
     @classmethod
-    def reconstitute(cls, id: uuid.UUID, amount: Money, state: PaymentState) -> "Payment":
-        payment = cls(id=id, amount=amount)
+    def reconstitute(
+        cls, id: uuid.UUID, user_id: uuid.UUID, amount: Money, state: PaymentState
+    ) -> "Payment":
+        payment = cls(id=id, user_id=user_id, amount=amount)
         payment._state = state
         return payment

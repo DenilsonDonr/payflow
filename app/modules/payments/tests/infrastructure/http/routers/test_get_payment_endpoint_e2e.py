@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -8,6 +10,7 @@ def test_get_payment_endpoint_e2e(client: TestClient, payment_cleanup: dict[str,
     created_payment = payment_cleanup
 
     create_data_request = {
+        "user_id": str(uuid.uuid4()),
         "amount": "100.00",
         "currency": "USD",
     }
@@ -22,5 +25,6 @@ def test_get_payment_endpoint_e2e(client: TestClient, payment_cleanup: dict[str,
     get_response = client.get(f"/api/v1/payments/{create_response.json().get('id')}")
 
     assert get_response.status_code == 200
+    assert get_response.json().get("user_id") == create_data_request["user_id"]
     assert get_response.json().get("amount") == create_response.json().get("amount")
     assert get_response.json().get("currency") == create_response.json().get("currency")

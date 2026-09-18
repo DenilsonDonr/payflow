@@ -11,6 +11,7 @@ from app.modules.payments.domain.value_objects.money import Money
 
 DEFAULT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
 
 
 def money(amount: str = "100.00", currency: str = "USD") -> Money:
@@ -18,7 +19,7 @@ def money(amount: str = "100.00", currency: str = "USD") -> Money:
 
 
 def make_payment(id: uuid.UUID = DEFAULT_ID, amount: Money | None = None) -> Payment:
-    return Payment(id=id, amount=amount if amount is not None else money())
+    return Payment(id=id, user_id=USER_ID, amount=amount if amount is not None else money())
 
 
 def payment_in(state: PaymentState, amount: Money | None = None) -> Payment:
@@ -61,10 +62,11 @@ ILLEGAL_TRANSITIONS = [
 
 
 class TestPaymentCreation:
-    def test_creates_payment_with_given_id_and_amount(self):
-        payment = Payment(id=DEFAULT_ID, amount=money())
+    def test_creates_payment_with_given_id_user_and_amount(self):
+        payment = Payment(id=DEFAULT_ID, user_id=USER_ID, amount=money())
 
         assert payment.id == DEFAULT_ID
+        assert payment.user_id == USER_ID
         assert payment.amount == money()
 
     def test_is_always_born_pending(self):
@@ -75,12 +77,19 @@ class TestPaymentCreation:
     )
     def test_rejects_non_uuid_id(self, id: object):
         with pytest.raises(TypeError, match="Payment ID must be a UUID"):
-            Payment(id=id, amount=money())  # pyright: ignore[reportArgumentType]
+            Payment(id=id, user_id=USER_ID, amount=money())  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.parametrize("amount", [None, 100.00, "100.00", True, Decimal("100.00"), 100])
     def test_rejects_non_money_amount(self, amount: object):
         with pytest.raises(TypeError, match="Payment amount must be an instance of Money"):
-            Payment(id=DEFAULT_ID, amount=amount)  # pyright: ignore[reportArgumentType]
+            Payment(id=DEFAULT_ID, user_id=USER_ID, amount=amount)  # pyright: ignore[reportArgumentType]
+
+    @pytest.mark.parametrize(
+        "user_id", [None, 123, 1.5, True, [], "11111111-1111-1111-1111-111111111111"]
+    )
+    def test_rejects_non_uuid_user_id(self, user_id: object):
+        with pytest.raises(TypeError, match="Payment user ID must be a UUID"):
+            Payment(id=DEFAULT_ID, user_id=user_id, amount=money())  # pyright: ignore[reportArgumentType]
 
 
 class TestPaymentTransitions:
@@ -133,9 +142,14 @@ class TestPaymentTransitions:
         assert payment.amount == money("250.50")
 
     def test_reconstitute_restores_the_given_state(self):
-        payment = Payment.reconstitute(DEFAULT_ID, money(), PaymentState.APPROVED)
+        payment = Payment.reconstitute(DEFAULT_ID, USER_ID, money(), PaymentState.APPROVED)
 
         assert payment.state == PaymentState.APPROVED
+
+    def test_reconstitute_restores_the_given_user(self):
+        payment = Payment.reconstitute(DEFAULT_ID, USER_ID, money(), PaymentState.APPROVED)
+
+        assert payment.user_id == USER_ID
 
 
 class TestPaymentImmutability:
@@ -143,6 +157,7 @@ class TestPaymentImmutability:
         ("attribute", "value"),
         [
             ("id", OTHER_ID),
+            ("user_id", OTHER_ID),
             ("state", PaymentState.PENDING),
             ("amount", money("999.99")),
         ],

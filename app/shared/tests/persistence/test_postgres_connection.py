@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
@@ -66,8 +68,9 @@ class TestConnectionDB:
         with pytest.raises(RuntimeError):
             async with single_connection_db.connection() as conn:
                 await conn.execute(
-                    "INSERT INTO payments (id, amount, currency, state) VALUES (%s, %s, %s, %s)",
-                    (payment_id, 1, "USD", "pending"),
+                    "INSERT INTO payments (id, user_id, amount, currency, state)"
+                    " VALUES (%s, %s, %s, %s, %s)",
+                    (payment_id, uuid.uuid4(), 1, "USD", "pending"),
                 )
                 raise RuntimeError("the caller blew up after writing")
 

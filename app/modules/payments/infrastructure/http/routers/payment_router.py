@@ -39,11 +39,14 @@ async def create_payment(
     use_case: CreatePaymentUseCase = Depends(get_create_payment_use_case),
 ):
     try:
-        created_payment = await use_case.execute(amount=request.amount, currency=request.currency)
+        created_payment = await use_case.execute(
+            user_id=request.user_id, amount=request.amount, currency=request.currency
+        )
         # Nothing evaluates the payment yet: it is returned PENDING and stays there until a
         # consumer picks it up. That consumer is Kafka's job, not this handler's.
         return PaymentResponse(
             id=created_payment.id,
+            user_id=created_payment.user_id,
             amount=created_payment.amount.amount,
             currency=created_payment.amount.currency,
             state=created_payment.state.value,
@@ -66,6 +69,7 @@ async def get_payment(
         raise HTTPException(status_code=404, detail="Payment not found")
     return PaymentResponse(
         id=payment.id,
+        user_id=payment.user_id,
         amount=payment.amount.amount,
         currency=payment.amount.currency,
         state=payment.state.value,

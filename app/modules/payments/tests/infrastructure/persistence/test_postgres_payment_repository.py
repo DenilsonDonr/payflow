@@ -19,6 +19,8 @@ from app.shared.persistence.postgres_connection import (
 
 pytestmark = pytest.mark.integration
 
+USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+
 
 @pytest.fixture
 async def payment_repository():
@@ -55,24 +57,33 @@ class TestPostgresPaymentRepository:
     ):
         repo, fixed_id = payment_repository
         await repo.create_payment(
-            payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD"))
+            payment=Payment(
+                id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("100.00"), currency="USD")
+            )
         )
         with pytest.raises(PaymentAlreadyExistsError):
             await repo.create_payment(
-                payment=Payment(id=fixed_id, amount=Money(amount=Decimal("100.00"), currency="USD"))
+                payment=Payment(
+                    id=fixed_id,
+                    user_id=USER_ID,
+                    amount=Money(amount=Decimal("100.00"), currency="USD"),
+                )
             )
 
     async def test_create_payment_and_retrieve_payment(
         self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
     ):
         repo, fixed_id = payment_repository
-        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("150.00"), currency="USD"))
+        payment = Payment(
+            id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("150.00"), currency="USD")
+        )
         await repo.create_payment(payment=payment)
 
         retrieved_payment = await repo.get_payment_by_id(payment_id=fixed_id)
 
         assert retrieved_payment is not None
         assert retrieved_payment.id == payment.id
+        assert retrieved_payment.user_id == USER_ID
         assert retrieved_payment.amount.amount == payment.amount.amount
         assert retrieved_payment.amount.currency == payment.amount.currency
 
@@ -91,7 +102,9 @@ class TestPostgresPaymentRepository:
         self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
     ):
         repo, fixed_id = payment_repository
-        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("200.00"), currency="USD"))
+        payment = Payment(
+            id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("200.00"), currency="USD")
+        )
         payment.approve()
         payment.complete()
 
@@ -108,7 +121,9 @@ class TestPostgresPaymentRepository:
         self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
     ):
         repo, fixed_id = payment_repository
-        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
+        payment = Payment(
+            id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("300.00"), currency="USD")
+        )
         await repo.create_payment(payment=payment)
 
         assert payment.state == PaymentState.PENDING
@@ -125,7 +140,9 @@ class TestPostgresPaymentRepository:
         self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
     ):
         repo, fixed_id = payment_repository
-        payment = Payment(id=fixed_id, amount=Money(amount=Decimal("300.00"), currency="USD"))
+        payment = Payment(
+            id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("300.00"), currency="USD")
+        )
         # The payment is never persisted, so the UPDATE would otherwise affect zero rows silently.
 
         with pytest.raises(ValueError, match="not found"):

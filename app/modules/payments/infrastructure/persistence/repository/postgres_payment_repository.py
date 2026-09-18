@@ -21,17 +21,19 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
     async def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
         async with self.connection.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(
-                "SELECT id, amount, currency, state FROM payments WHERE id = %s", (str(payment_id),)
+                "SELECT id, user_id, amount, currency, state FROM payments WHERE id = %s",
+                (str(payment_id),),
             )
             row = await cursor.fetchone()
 
             if row is None:
                 return None
 
-            row_id, amount, currency, state = row
+            row_id, user_id, amount, currency, state = row
 
             return Payment.reconstitute(
                 id=uuid.UUID(row_id),
+                user_id=user_id,
                 amount=Money(amount=amount, currency=currency),
                 state=PaymentState(state),
             )
@@ -40,9 +42,11 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         try:
             async with self.connection.connection() as conn, conn.cursor() as cursor:
                 await cursor.execute(
-                    "INSERT INTO payments (id, amount, currency, state) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO payments (id, user_id, amount, currency, state)"
+                    " VALUES (%s, %s, %s, %s, %s)",
                     (
                         payment.id,
+                        payment.user_id,
                         payment.amount.amount,
                         payment.amount.currency,
                         payment.state.value,
