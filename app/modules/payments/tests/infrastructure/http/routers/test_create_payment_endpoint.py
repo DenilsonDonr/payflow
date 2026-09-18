@@ -17,6 +17,8 @@ from main import app
 
 client = TestClient(app)
 
+USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+
 
 @pytest.fixture(autouse=True)
 def clear_overrides():
@@ -41,6 +43,7 @@ def test_create_payment_endpoint():
     )
 
     data_request = PaymentCreateRequest(
+        user_id=USER_ID,
         amount=Decimal("100.00"),
         currency="USD",
     )
@@ -48,6 +51,17 @@ def test_create_payment_endpoint():
     response = client.post("/api/v1/payments", json=data_request.model_dump(mode="json"))
 
     assert response.status_code == 201
+    assert response.json().get("user_id") == str(USER_ID)
+
+
+def test_create_payment_endpoint_requires_user_id():
+    app.dependency_overrides[get_create_payment_use_case] = lambda: CreatePaymentUseCase(
+        payment_repository_port=InMemoryPaymentRepository()
+    )
+
+    response = client.post("/api/v1/payments", json={"amount": "100.00", "currency": "USD"})
+
+    assert response.status_code == 422
 
 
 def test_create_payment_endpoint_invalid_currency():
@@ -57,7 +71,9 @@ def test_create_payment_endpoint_invalid_currency():
 
     # Send raw JSON so FastAPI parses and validates the body itself (returning 422);
     # building PaymentCreateRequest(...) here would instead fail inside the test.
-    response = client.post("/api/v1/payments", json={"amount": "100.00", "currency": "US"})
+    response = client.post(
+        "/api/v1/payments", json={"user_id": str(USER_ID), "amount": "100.00", "currency": "US"}
+    )
 
     assert response.status_code == 422
 
@@ -69,7 +85,9 @@ def test_create_payment_endpoint_non_positive_amount(amount: str):
     )
 
     # Raw JSON for the same reason as the invalid currency case: FastAPI must validate the body.
-    response = client.post("/api/v1/payments", json={"amount": amount, "currency": "USD"})
+    response = client.post(
+        "/api/v1/payments", json={"user_id": str(USER_ID), "amount": amount, "currency": "USD"}
+    )
 
     assert response.status_code == 422
 
@@ -80,6 +98,7 @@ def test_create_payment_endpoint_duplicate_error():
     )
 
     data_request = PaymentCreateRequest(
+        user_id=USER_ID,
         amount=Decimal("100.00"),
         currency="USD",
     )

@@ -8,6 +8,8 @@ from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
 
+USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+
 
 class FailingPaymentRepository(PaymentRepositoryPort):
     async def get_payment_by_id(self, payment_id: uuid.UUID) -> Payment | None:
@@ -27,7 +29,9 @@ class TestPaymentCreate:
         create_payment_use_case = CreatePaymentUseCase(payment_repository_port=payment_repository)
 
         # Save a new payment using the use case
-        payment = await create_payment_use_case.execute(amount=Decimal("100.00"), currency="USD")
+        payment = await create_payment_use_case.execute(
+            user_id=USER_ID, amount=Decimal("100.00"), currency="USD"
+        )
 
         # verify that the payment was created and returned
         assert payment is not None
@@ -40,6 +44,17 @@ class TestPaymentCreate:
         assert saved_payment is not None
         assert saved_payment == payment
 
+    async def test_assigns_the_payment_to_the_given_user(self):
+        create_payment_use_case = CreatePaymentUseCase(
+            payment_repository_port=InMemoryPaymentRepository()
+        )
+
+        payment = await create_payment_use_case.execute(
+            user_id=USER_ID, amount=Decimal("100.00"), currency="USD"
+        )
+
+        assert payment.user_id == USER_ID
+
     async def test_raises_when_persistence_fails(self):
         payment_repository = FailingPaymentRepository()
 
@@ -47,4 +62,6 @@ class TestPaymentCreate:
 
         # The use case must propagate the repository's error, not swallow it
         with pytest.raises(RuntimeError):
-            await create_payment_use_case.execute(amount=Decimal("100.00"), currency="USD")
+            await create_payment_use_case.execute(
+                user_id=USER_ID, amount=Decimal("100.00"), currency="USD"
+            )

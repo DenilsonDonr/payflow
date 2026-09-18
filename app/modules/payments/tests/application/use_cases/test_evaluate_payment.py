@@ -16,7 +16,9 @@ class TestPaymentEvaluate:
     async def test_approved_verdict_transitions_payment_to_approved(self):
         payment_repository = InMemoryPaymentRepository()
 
-        payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
+        payment = Payment(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD")
+        )
         payment_repository.add(payment)
 
         evaluate_payment_use_case = EvaluatePaymentUseCase(
@@ -32,7 +34,9 @@ class TestPaymentEvaluate:
     async def test_rejected_verdict_transitions_payment_to_rejected(self):
         payment_repository = InMemoryPaymentRepository()
 
-        payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
+        payment = Payment(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD")
+        )
         payment_repository.add(payment)
 
         evaluate_payment_use_case = EvaluatePaymentUseCase(
@@ -48,7 +52,9 @@ class TestPaymentEvaluate:
     async def test_uppercase_verdict_transitions_payment_to_approved(self):
         payment_repository = InMemoryPaymentRepository()
 
-        payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
+        payment = Payment(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD")
+        )
         payment_repository.add(payment)
 
         evaluate_payment_use_case = EvaluatePaymentUseCase(
@@ -64,7 +70,9 @@ class TestPaymentEvaluate:
     async def test_invalid_verdict_raises_exception(self):
         payment_repository = InMemoryPaymentRepository()
 
-        payment = Payment(id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD"))
+        payment = Payment(
+            id=uuid.uuid4(), user_id=uuid.uuid4(), amount=Money(Decimal("100.00"), "USD")
+        )
         payment_repository.add(payment)
 
         evaluate_payment_use_case = EvaluatePaymentUseCase(

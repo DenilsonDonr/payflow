@@ -5,6 +5,8 @@ from pydantic import BaseModel, field_validator
 
 
 class PaymentCreateRequest(BaseModel):
+    # Temporary: sent by the client until authentication supplies it from the token.
+    user_id: uuid.UUID
     amount: Decimal
     currency: str
 
@@ -25,6 +27,7 @@ class PaymentCreateRequest(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: uuid.UUID
+    user_id: uuid.UUID
     amount: Decimal
     currency: str
     state: str

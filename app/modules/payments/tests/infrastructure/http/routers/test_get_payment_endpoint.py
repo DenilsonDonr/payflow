@@ -23,7 +23,11 @@ def clear_overrides():
 def test_get_payment_endpoint():
     object_in_memory_repository = InMemoryPaymentRepository()
 
-    payment = Payment(id=uuid.uuid4(), amount=Money(amount=Decimal("100.00"), currency="USD"))
+    payment = Payment(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        amount=Money(amount=Decimal("100.00"), currency="USD"),
+    )
 
     object_in_memory_repository.add(payment)
 
@@ -35,6 +39,7 @@ def test_get_payment_endpoint():
 
     assert response.status_code == 200
     assert response.json().get("id") == str(payment.id)
+    assert response.json().get("user_id") == str(payment.user_id)
     assert response.json().get("amount") == str(payment.amount.amount)
     assert response.json().get("currency") == payment.amount.currency
 

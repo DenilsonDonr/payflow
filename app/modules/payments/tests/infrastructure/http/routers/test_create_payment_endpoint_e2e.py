@@ -12,6 +12,7 @@ def test_create_payment_endpoint_e2e(
     created_payment = payment_cleanup
 
     data_request = {
+        "user_id": str(uuid.uuid4()),
         "amount": "100.00",
         "currency": "USD",
     }
