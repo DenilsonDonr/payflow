@@ -26,5 +26,5 @@ async def payment_cleanup():
     async with conn:
         if created_payment["payment_id"] is not None:
             await conn.execute(
-                "DELETE FROM payments WHERE id = %s", (str(created_payment["payment_id"]),)
+                "DELETE FROM payments WHERE id = %s", (created_payment["payment_id"],)
             )

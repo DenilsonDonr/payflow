@@ -22,7 +22,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         async with self.connection.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(
                 "SELECT id, user_id, amount, currency, state FROM payments WHERE id = %s",
-                (str(payment_id),),
+                (payment_id,),
             )
             row = await cursor.fetchone()
 
@@ -32,7 +32,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
             row_id, user_id, amount, currency, state = row
 
             return Payment.reconstitute(
-                id=uuid.UUID(row_id),
+                id=row_id,
                 user_id=user_id,
                 amount=Money(amount=amount, currency=currency),
                 state=PaymentState(state),
@@ -65,7 +65,7 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
         async with self.connection.connection() as conn, conn.cursor() as cursor:
             await cursor.execute(
                 "UPDATE payments SET state = %s WHERE id = %s",
-                (payment.state.value, str(payment.id)),
+                (payment.state.value, payment.id),
             )
 
             if cursor.rowcount == 0:

@@ -63,7 +63,7 @@ class TestConnectionDB:
             assert await cursor.fetchone() == (1,)
 
     async def test_rolls_back_what_a_failing_block_wrote(self, single_connection_db: ConnectionDB):
-        payment_id = "rollback-probe"
+        payment_id = uuid.uuid4()
 
         with pytest.raises(RuntimeError):
             async with single_connection_db.connection() as conn:
