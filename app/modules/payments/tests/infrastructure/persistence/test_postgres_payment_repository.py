@@ -46,7 +46,7 @@ async def payment_repository():
 
     # Tear down: delete the test payment record if it exists
     async with db_connection.connection() as conn, conn.cursor() as cursor:
-        await cursor.execute("DELETE FROM payments WHERE id = %s", (str(fixed_id),))
+        await cursor.execute("DELETE FROM payments WHERE id = %s", (fixed_id,))
 
     await pool.close()
 
