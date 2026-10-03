@@ -11,7 +11,10 @@ class CreatePaymentUseCase:
         self.payment_repository_port = payment_repository_port
 
     async def execute(self, user_id: uuid.UUID, amount: Decimal, currency: str) -> Payment:
-        payment = Payment(
-            id=uuid.uuid4(), user_id=user_id, amount=Money(amount=amount, currency=currency)
+        payment = Payment.create(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            amount=Money(amount=amount, currency=currency),
+            event_id=uuid.uuid4(),
         )
         return await self.payment_repository_port.create_payment(payment)
