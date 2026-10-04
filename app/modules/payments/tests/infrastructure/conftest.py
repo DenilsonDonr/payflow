@@ -22,9 +22,12 @@ async def payment_cleanup():
 
     yield created_payment
 
-    # Tear down: delete the payment created during the test
+    # Tear down: delete the payment created during the test and its outbox rows
     async with conn:
         if created_payment["payment_id"] is not None:
             await conn.execute(
                 "DELETE FROM payments WHERE id = %s", (created_payment["payment_id"],)
+            )
+            await conn.execute(
+                "DELETE FROM outbox WHERE aggregate_id = %s", (created_payment["payment_id"],)
             )
