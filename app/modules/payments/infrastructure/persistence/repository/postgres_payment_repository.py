@@ -1,6 +1,7 @@
 import uuid
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
 from app.modules.payments.domain.exceptions.payment_already_exists import PaymentAlreadyExistsError
@@ -53,9 +54,27 @@ class PostgresPaymentRepository(PaymentRepositoryPort):
                     ),
                 )
 
+                # Drained inside the transaction so the rows commit or roll back with the payment.
+                # Tradeoff: pull_events() empties the entity and a rollback does not restore it.
+                # Harmless today, as the use case neither retries nor reuses the payment on error.
+                for event in payment.pull_events():
+                    await cursor.execute(
+                        "INSERT INTO outbox"
+                        " (event_id, aggregate_type, aggregate_id, event_type, payload)"
+                        " VALUES (%s, %s, %s, %s, %s)",
+                        (
+                            event.event_id,
+                            event.aggregate_type,
+                            event.aggregate_id,
+                            event.event_type,
+                            Jsonb(event.payload()),
+                        ),
+                    )
+
                 return payment
         except psycopg.IntegrityError as e:
-            if e.sqlstate == "23505":  # Unique violation error code
+            # Only the payments PK means "already exists"; an outbox unique violation is also 23505.
+            if e.sqlstate == "23505" and e.diag.constraint_name == "payments_pkey":
                 raise PaymentAlreadyExistsError(
                     f"Payment with ID {payment.id} already exists."
                 ) from e

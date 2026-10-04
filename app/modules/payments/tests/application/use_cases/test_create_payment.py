@@ -5,6 +5,7 @@ import pytest
 
 from app.modules.payments.application.use_cases.create_payment_use_case import CreatePaymentUseCase
 from app.modules.payments.domain.entities.payment import Payment
+from app.modules.payments.domain.events.payment_created import PaymentCreated
 from app.modules.payments.domain.ports.payment_repository_port import PaymentRepositoryPort
 from app.modules.payments.tests.fakes.in_memory_payment_repository import InMemoryPaymentRepository
 
@@ -54,6 +55,20 @@ class TestPaymentCreate:
         )
 
         assert payment.user_id == USER_ID
+
+    async def test_produces_one_pending_payment_created_event(self):
+        create_payment_use_case = CreatePaymentUseCase(
+            payment_repository_port=InMemoryPaymentRepository()
+        )
+
+        payment = await create_payment_use_case.execute(
+            user_id=USER_ID, amount=Decimal("100.00"), currency="USD"
+        )
+
+        (event,) = payment.pull_events()
+        assert isinstance(event, PaymentCreated)
+        assert event.aggregate_id == payment.id
+        assert event.payload()["state"] == "pending"
 
     async def test_raises_when_persistence_fails(self):
         payment_repository = FailingPaymentRepository()

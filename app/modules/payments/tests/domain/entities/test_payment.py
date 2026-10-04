@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
+from app.modules.payments.domain.events.payment_created import PaymentCreated
 from app.modules.payments.domain.exceptions.invalid_payment_transition import (
     InvalidPaymentTransitionError,
 )
@@ -12,6 +13,7 @@ from app.modules.payments.domain.value_objects.money import Money
 DEFAULT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+EVENT_ID = uuid.UUID("00000000-0000-0000-0000-0000000000e1")
 
 
 def money(amount: str = "100.00", currency: str = "USD") -> Money:
@@ -214,3 +216,86 @@ class TestPaymentRepresentation:
 
         assert str(DEFAULT_ID) in repr(payment)
         assert "PENDING" in repr(payment).upper()
+
+
+def created_event_stub() -> PaymentCreated:
+    return PaymentCreated(
+        event_id=EVENT_ID,
+        payment_id=DEFAULT_ID,
+        user_id=USER_ID,
+        amount=money(),
+        state="pending",
+    )
+
+
+class TestPaymentEvents:
+    def test_create_records_exactly_one_payment_created_event(self):
+        payment = Payment.create(id=DEFAULT_ID, user_id=USER_ID, amount=money(), event_id=EVENT_ID)
+
+        events = payment.pull_events()
+
+        assert len(events) == 1
+        assert isinstance(events[0], PaymentCreated)
+
+    def test_create_event_carries_the_injected_event_id_and_the_payment_id(self):
+        payment = Payment.create(id=DEFAULT_ID, user_id=USER_ID, amount=money(), event_id=EVENT_ID)
+
+        (event,) = payment.pull_events()
+
+        assert event.event_id == EVENT_ID
+        assert event.aggregate_id == DEFAULT_ID
+
+    def test_create_builds_a_pending_payment_with_the_given_data(self):
+        amount = money("42.00", "EUR")
+
+        payment = Payment.create(id=DEFAULT_ID, user_id=USER_ID, amount=amount, event_id=EVENT_ID)
+
+        assert payment.id == DEFAULT_ID
+        assert payment.user_id == USER_ID
+        assert payment.amount == amount
+        assert payment.state is PaymentState.PENDING
+
+    def test_event_payload_describes_the_created_payment(self):
+        payment = Payment.create(
+            id=DEFAULT_ID, user_id=USER_ID, amount=money("100.00"), event_id=EVENT_ID
+        )
+
+        (event,) = payment.pull_events()
+
+        assert event.payload() == {
+            "id": str(DEFAULT_ID),
+            "user_id": str(USER_ID),
+            "amount": "100.00",
+            "currency": "USD",
+            "state": "pending",
+        }
+
+    def test_pull_events_drains_the_accumulated_events(self):
+        payment = Payment.create(id=DEFAULT_ID, user_id=USER_ID, amount=money(), event_id=EVENT_ID)
+
+        first = payment.pull_events()
+        second = payment.pull_events()
+
+        assert len(first) == 1
+        assert second == []
+
+    def test_mutating_the_pulled_list_does_not_affect_the_payment(self):
+        payment = Payment.create(id=DEFAULT_ID, user_id=USER_ID, amount=money(), event_id=EVENT_ID)
+
+        # Mutating a pulled list must never leak back into the entity's own state.
+        payment.pull_events().append(created_event_stub())
+
+        assert payment.pull_events() == []
+
+    def test_a_payment_built_with_init_records_no_event(self):
+        assert make_payment().pull_events() == []
+
+    def test_a_reconstituted_payment_records_no_event(self):
+        payment = Payment.reconstitute(DEFAULT_ID, USER_ID, money(), PaymentState.APPROVED)
+
+        assert payment.pull_events() == []
+
+    def test_transitions_do_not_record_events_yet(self):
+        payment = payment_in(PaymentState.COMPLETED)
+
+        assert payment.pull_events() == []

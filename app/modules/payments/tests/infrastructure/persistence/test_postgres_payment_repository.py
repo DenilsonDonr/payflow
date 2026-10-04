@@ -1,9 +1,11 @@
 import uuid
 from decimal import Decimal
 
+import psycopg
 import pytest
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
+from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
 from app.modules.payments.domain.entities.payment import Payment, PaymentState
@@ -44,9 +46,10 @@ async def payment_repository():
 
     yield repo, fixed_id
 
-    # Tear down: delete the test payment record if it exists
+    # Tear down: delete the test payment and the outbox rows tied to it, if they exist.
     async with db_connection.connection() as conn, conn.cursor() as cursor:
         await cursor.execute("DELETE FROM payments WHERE id = %s", (fixed_id,))
+        await cursor.execute("DELETE FROM outbox WHERE aggregate_id = %s", (fixed_id,))
 
     await pool.close()
 
@@ -147,3 +150,108 @@ class TestPostgresPaymentRepository:
 
         with pytest.raises(ValueError, match="not found"):
             await repo.update_payment(payment=payment)
+
+
+class TestPostgresPaymentRepositoryOutbox:
+    async def test_create_payment_writes_one_outbox_row_for_its_event(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
+        repo, fixed_id = payment_repository
+        event_id = uuid.uuid4()
+        payment = Payment.create(
+            id=fixed_id,
+            user_id=USER_ID,
+            amount=Money(amount=Decimal("100.50"), currency="USD"),
+            event_id=event_id,
+        )
+
+        await repo.create_payment(payment=payment)
+
+        async with repo.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT event_id, aggregate_type, aggregate_id, event_type, payload,"
+                " status, attempts, processed_at FROM outbox WHERE aggregate_id = %s",
+                (fixed_id,),
+            )
+            rows = await cursor.fetchall()
+
+        assert len(rows) == 1
+        (row_event_id, aggregate_type, aggregate_id, event_type, payload, status, attempts,
+         processed_at) = rows[0]  # fmt: skip
+        assert row_event_id == event_id
+        assert aggregate_type == "payment"
+        assert aggregate_id == fixed_id
+        assert event_type == "payment.created"
+        assert payload["amount"] == "100.50"
+        assert payload["id"] == str(fixed_id)
+        assert status == "pending"
+        assert attempts == 0
+        assert processed_at is None
+
+    async def test_create_payment_without_pending_events_writes_no_outbox_row(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
+        repo, fixed_id = payment_repository
+        payment = Payment(
+            id=fixed_id, user_id=USER_ID, amount=Money(amount=Decimal("10.00"), currency="USD")
+        )
+
+        await repo.create_payment(payment=payment)
+
+        async with repo.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute("SELECT count(*) FROM outbox WHERE aggregate_id = %s", (fixed_id,))
+            row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == 0
+
+    async def test_failed_outbox_insert_rolls_back_the_payment(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
+        repo, fixed_id = payment_repository
+        taken_event_id = uuid.uuid4()
+        await self._insert_outbox_row(repo, fixed_id, taken_event_id)
+        payment = Payment.create(
+            id=fixed_id,
+            user_id=USER_ID,
+            amount=Money(amount=Decimal("100.00"), currency="USD"),
+            event_id=taken_event_id,
+        )
+
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            await repo.create_payment(payment=payment)
+
+        async with repo.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute("SELECT count(*) FROM payments WHERE id = %s", (fixed_id,))
+            row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == 0
+
+    async def test_outbox_unique_violation_is_not_reported_as_payment_already_exists(
+        self, payment_repository: tuple[PostgresPaymentRepository, uuid.UUID]
+    ):
+        repo, fixed_id = payment_repository
+        taken_event_id = uuid.uuid4()
+        await self._insert_outbox_row(repo, fixed_id, taken_event_id)
+        payment = Payment.create(
+            id=fixed_id,
+            user_id=USER_ID,
+            amount=Money(amount=Decimal("100.00"), currency="USD"),
+            event_id=taken_event_id,
+        )
+
+        with pytest.raises(psycopg.errors.UniqueViolation) as excinfo:
+            await repo.create_payment(payment=payment)
+
+        assert not isinstance(excinfo.value, PaymentAlreadyExistsError)
+        assert excinfo.value.diag.constraint_name == "uq_outbox_event_id"
+
+    @staticmethod
+    async def _insert_outbox_row(
+        repo: PostgresPaymentRepository, aggregate_id: uuid.UUID, event_id: uuid.UUID
+    ) -> None:
+        async with repo.connection.connection() as conn, conn.cursor() as cursor:
+            await cursor.execute(
+                "INSERT INTO outbox (event_id, aggregate_type, aggregate_id, event_type, payload)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                (event_id, "payment", aggregate_id, "payment.created", Jsonb({})),
+            )

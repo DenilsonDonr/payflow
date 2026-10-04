@@ -1,6 +1,8 @@
 import uuid
 from enum import Enum
 
+from app.modules.payments.domain.events.domain_event import DomainEvent
+from app.modules.payments.domain.events.payment_created import PaymentCreated
 from app.modules.payments.domain.exceptions.invalid_payment_transition import (
     InvalidPaymentTransitionError,
 )
@@ -30,6 +32,7 @@ class Payment:
         self._user_id = user_id
         self._state = PaymentState.PENDING
         self._amount = amount
+        self._events: list[DomainEvent] = []
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Payment):
@@ -58,6 +61,12 @@ class Payment:
     def amount(self) -> Money:
         return self._amount
 
+    def pull_events(self) -> list[DomainEvent]:
+        """Return the accumulated events and clear them, so each is published once."""
+        events = self._events
+        self._events = []
+        return events
+
     def approve(self) -> None:
         self._transition(to_state=PaymentState.APPROVED, allowed_from=PaymentState.PENDING)
 
@@ -76,6 +85,22 @@ class Payment:
                 f"Cannot move a payment from {self._state.value} to {to_state.value}."
             )
         self._state = to_state
+
+    @classmethod
+    def create(
+        cls, id: uuid.UUID, user_id: uuid.UUID, amount: Money, event_id: uuid.UUID
+    ) -> "Payment":
+        payment = cls(id=id, user_id=user_id, amount=amount)
+        payment._events.append(
+            PaymentCreated(
+                event_id=event_id,
+                payment_id=payment.id,
+                user_id=payment.user_id,
+                amount=payment.amount,
+                state=payment.state.value,
+            )
+        )
+        return payment
 
     @classmethod
     def reconstitute(
