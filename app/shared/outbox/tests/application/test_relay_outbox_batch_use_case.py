@@ -147,6 +147,40 @@ class TestRelayOutboxBatchUseCasePublishFailure:
         assert 1 in store.rescheduled
         assert store.failed == {}
 
+    async def test_first_failure_goes_straight_to_failed_when_max_attempts_is_one(self):
+        message = make_message(1)
+        store = InMemoryOutboxStore([message])
+        publisher = FakeEventPublisher()
+        publisher.fail_with(message.event_id, RuntimeError("down"))
+        backoff = StubBackoff()
+
+        await build_use_case(store, publisher, backoff, max_attempts=1).execute()
+
+        assert store.failed == {1: "RuntimeError: down"}
+        assert store.rescheduled == {}
+        assert backoff.calls == []
+
+    async def test_a_poison_message_is_retried_max_attempts_times_then_marked_failed(self):
+        message = make_message(1)
+        store = InMemoryOutboxStore([message])
+        publisher = FakeEventPublisher()
+        publisher.fail_with(message.event_id, RuntimeError("poison"))
+        backoff = StubBackoff()
+        use_case = build_use_case(store, publisher, backoff, max_attempts=3)
+
+        executions = 0
+        # Hard bound: a regression in the retry ceiling fails instead of looping.
+        while 1 not in store.failed and executions < 10:
+            await use_case.execute()
+            executions += 1
+
+        assert executions == 3
+        assert store.failed == {1: "RuntimeError: poison"}
+        # Two reschedules (previous-attempt counts 0 and 1), then the final failure.
+        assert backoff.calls == [0, 1]
+        assert store.commits == 3
+        assert await use_case.execute() == 0
+
     async def test_one_failing_message_does_not_stop_the_rest_of_the_batch(self):
         messages = [make_message(1), make_message(2), make_message(3)]
         store = InMemoryOutboxStore(messages)

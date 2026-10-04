@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from dataclasses import replace
 
 from app.shared.outbox.domain.outbox_message import OutboxMessage
 from app.shared.outbox.domain.ports.outbox_store_port import ClaimedOutboxBatch, OutboxStorePort
@@ -33,6 +34,7 @@ class InMemoryOutboxStore(OutboxStorePort):
 
     Backoff timing is not simulated: a rescheduled row is recorded but is
     claimable again immediately, which is enough for use-case unit tests.
+    A rescheduled row does come back with `attempts + 1`, like the real store.
     """
 
     def __init__(self, messages: list[OutboxMessage]) -> None:
@@ -62,4 +64,9 @@ class InMemoryOutboxStore(OutboxStorePort):
         self.rescheduled.update(batch.rescheduled)
         self.failed.update(batch.failed)
         resolved = set(batch.published) | set(batch.failed)
-        self._pending = [m for m in self._pending if m.id not in resolved]
+        # Without the increment the relay's retry ceiling never triggers.
+        self._pending = [
+            replace(m, attempts=m.attempts + 1) if m.id in batch.rescheduled else m
+            for m in self._pending
+            if m.id not in resolved
+        ]

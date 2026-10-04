@@ -18,11 +18,21 @@ class ClaimedOutboxBatch(ABC):
 
     @abstractmethod
     async def reschedule(self, message_id: int, *, delay_seconds: float, error: str) -> None:
-        pass
+        """Record a failed attempt and retry later.
+
+        Increments the row's `attempts` by one, and the row becomes claimable
+        again only after `delay_seconds`. The relay's retry ceiling
+        (`attempts + 1 >= max_attempts`) terminates only if every adapter
+        honours this increment.
+        """
 
     @abstractmethod
     async def mark_failed(self, message_id: int, *, error: str) -> None:
-        pass
+        """Record the final failed attempt; the row is never claimed again.
+
+        Increments the row's `attempts` by one, like `reschedule`, so the
+        stored count always equals the publish attempts actually made.
+        """
 
 
 class OutboxStorePort(ABC):

@@ -15,11 +15,13 @@ def full_jitter_backoff(
     cap_seconds: float,
     rng: RandomSource,
 ) -> float:
-    """Seconds to wait before retrying a row that already failed `attempts` times.
+    """Seconds to wait before retrying a row after its current failure.
 
-    The delay is drawn uniformly from [0, min(cap, base * 2**attempts)]. The
-    randomness is the point: rows that failed together during a broker outage
-    would otherwise share the same `available_at` and retry in lockstep.
+    `attempts` counts the failures recorded BEFORE the current one, so the
+    first failure passes 0 and waits up to `base_seconds`. The delay is drawn
+    uniformly from [0, min(cap, base * 2**attempts)]. The randomness is the
+    point: rows that failed together during a broker outage would otherwise
+    share the same `available_at` and retry in lockstep.
     """
     if attempts < 0:
         raise ValueError(f"attempts must be >= 0, got {attempts}")

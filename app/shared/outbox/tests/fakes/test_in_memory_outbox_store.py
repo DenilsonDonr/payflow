@@ -48,6 +48,17 @@ class TestInMemoryOutboxStoreCommit:
 
         assert await claimed_ids(store) == [2]
 
+    async def test_rescheduled_row_is_reclaimed_with_attempts_incremented_by_one(self):
+        # The real store increments `attempts` in SQL; the relay's retry ceiling
+        # only terminates because of it, so the fake must model it too.
+        store = InMemoryOutboxStore([make_message(1)])
+
+        async with store.claim(10) as batch:
+            await batch.reschedule(1, delay_seconds=1.0, error="boom")
+
+        async with store.claim(10) as batch:
+            assert [(m.id, m.attempts) for m in batch.messages] == [(1, 1)]
+
     async def test_claim_returns_at_most_limit_messages_in_order(self):
         store = InMemoryOutboxStore([make_message(i) for i in range(1, 6)])
 
