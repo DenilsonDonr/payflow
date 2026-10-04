@@ -1,3 +1,4 @@
+import math
 from typing import Protocol
 
 
@@ -22,9 +23,10 @@ def full_jitter_backoff(
     """
     if attempts < 0:
         raise ValueError(f"attempts must be >= 0, got {attempts}")
-    if base_seconds <= 0:
+    # NaN slips past every `<=` comparison and inf makes the ceiling unbounded.
+    if not math.isfinite(base_seconds) or base_seconds <= 0:
         raise ValueError(f"base_seconds must be > 0, got {base_seconds}")
-    if cap_seconds < base_seconds:
+    if not math.isfinite(cap_seconds) or cap_seconds < base_seconds:
         raise ValueError(f"cap_seconds ({cap_seconds}) must be >= base_seconds ({base_seconds})")
 
     # Double step by step and stop at the cap: `base * 2**attempts` raises

@@ -1,3 +1,4 @@
+import math
 import random
 
 import pytest
@@ -95,6 +96,20 @@ class TestFullJitterBackoff:
         with pytest.raises(ValueError, match="base_seconds"):
             full_jitter_backoff(
                 0, base_seconds=base_seconds, cap_seconds=300.0, rng=StubRandomSource()
+            )
+
+    @pytest.mark.parametrize("base_seconds", [math.nan, math.inf])
+    def test_rejects_non_finite_base(self, base_seconds: float):
+        with pytest.raises(ValueError, match="base_seconds"):
+            full_jitter_backoff(
+                0, base_seconds=base_seconds, cap_seconds=math.inf, rng=StubRandomSource()
+            )
+
+    @pytest.mark.parametrize("cap_seconds", [math.nan, math.inf])
+    def test_rejects_non_finite_cap(self, cap_seconds: float):
+        with pytest.raises(ValueError, match="cap_seconds"):
+            full_jitter_backoff(
+                0, base_seconds=1.0, cap_seconds=cap_seconds, rng=StubRandomSource()
             )
 
     def test_rejects_cap_below_base(self):
