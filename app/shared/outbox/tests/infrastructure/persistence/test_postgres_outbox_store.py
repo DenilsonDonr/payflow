@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime, timedelta
@@ -32,6 +33,10 @@ pytestmark = pytest.mark.integration
 # equals the number of rows inserted never reaches a row the test does not own.
 LONG_AGO = datetime(2000, 1, 1, tzinfo=UTC)
 
+# Only the full-flow test dates a real payment.created row at this instant, so the sweep can
+# recognise it without touching other payment rows.
+FULL_FLOW_SENTINEL = datetime(1999, 1, 1, tzinfo=UTC)
+
 # Failing here means SKIP LOCKED is not in effect: the second claim would wait on A's row locks.
 LOCK_WAIT_GUARD_SECONDS = 5
 
@@ -44,13 +49,14 @@ def long_ago(seconds: int) -> datetime:
 
 
 async def sweep_stale_test_rows(pool: AsyncConnectionPool[AsyncConnection[TupleRow]]) -> None:
-    # Rows left by an interrupted run. No real row is this old: available_at defaults to now().
+    # Rows left by an interrupted run, matched by what only this suite creates.
     async with pool.connection() as conn:
         await conn.execute(
-            "DELETE FROM payments WHERE id IN"
-            " (SELECT aggregate_id FROM outbox WHERE available_at < '2001-01-01')"
+            "DELETE FROM outbox WHERE"
+            " (aggregate_type = 'test' AND available_at < '2001-01-01')"
+            " OR (aggregate_type = 'payment' AND available_at = %s)",
+            (FULL_FLOW_SENTINEL,),
         )
-        await conn.execute("DELETE FROM outbox WHERE available_at < '2001-01-01'")
 
 
 @pytest.fixture
@@ -249,7 +255,9 @@ class TestOutcomes:
         before = await db_clock()
 
         async with store.claim(1) as batch:
-            await asyncio.sleep(0.3)  # a slow publish: now() would still read the batch start
+            # A slow publish: now() would still read the batch start. Sleeping past the asserted
+            # 0.3s margin keeps the bound off the knife-edge between host and server clocks.
+            await asyncio.sleep(0.5)
             await batch.mark_published(message_id)
 
         row = await fetch_row(message_id)
@@ -289,7 +297,7 @@ class TestOutcomes:
         before = await db_clock()
 
         async with store.claim(1) as batch:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
             await batch.reschedule(message_id, delay_seconds=60, error="boom")
 
         row = await fetch_row(message_id)
@@ -365,7 +373,9 @@ class TestBatchGuards:
         # Not due, so never claimed, yet still a pending row the UPDATE could reach by id.
         unclaimed = await insert_row(available_at=datetime.now(UTC) + timedelta(hours=1))
 
-        with pytest.raises(ValueError, match=str(unclaimed)):
+        with pytest.raises(
+            ValueError, match=rf"^outbox message {unclaimed} was not claimed by this batch$"
+        ):
             async with store.claim(1) as batch:
                 assert [m.id for m in batch.messages] == [claimed]
                 await outcome(batch, unclaimed)
@@ -383,7 +393,9 @@ class TestBatchGuards:
         first = await insert_row(available_at=long_ago(1))
         second = await insert_row(available_at=long_ago(2))
 
-        with pytest.raises(RuntimeError, match=str(first)):
+        with pytest.raises(
+            RuntimeError, match=rf"^outbox message {first} already has an outcome in this batch$"
+        ):
             async with store.claim(2) as batch:
                 await batch.mark_published(second)
                 await batch.mark_published(first)
@@ -392,6 +404,29 @@ class TestBatchGuards:
         for message_id in (first, second):
             row = await fetch_row(message_id)
             assert (row["status"], row["attempts"], row["processed_at"]) == ("pending", 0, None)
+
+    async def test_overlapping_outcomes_for_the_same_id_let_only_one_through(
+        self,
+        outcome: Outcome,
+        store: PostgresOutboxStore,
+        insert_row: InsertRow,
+        fetch_row: FetchRow,
+    ):
+        # Both calls are in flight at once, so the guard must hold across the UPDATE's await.
+        message_id = await insert_row(available_at=long_ago(1))
+
+        async with store.claim(1) as batch:
+            results = await asyncio.gather(
+                batch.reschedule(message_id, delay_seconds=60, error="boom"),
+                outcome(batch, message_id),
+                return_exceptions=True,
+            )
+
+        errors = [r for r in results if isinstance(r, BaseException)]
+        assert len(errors) == 1
+        assert isinstance(errors[0], RuntimeError)
+        row = await fetch_row(message_id)
+        assert row["attempts"] == 1
 
     async def test_a_second_outcome_after_a_reschedule_also_fails(
         self,
@@ -403,7 +438,10 @@ class TestBatchGuards:
         # A reschedule leaves the row 'pending', so the status predicate alone cannot catch this.
         message_id = await insert_row(available_at=long_ago(1))
 
-        with pytest.raises(RuntimeError, match=str(message_id)):
+        with pytest.raises(
+            RuntimeError,
+            match=rf"^outbox message {message_id} already has an outcome in this batch$",
+        ):
             async with store.claim(1) as batch:
                 await batch.reschedule(message_id, delay_seconds=60, error="boom")
                 await outcome(batch, message_id)
@@ -422,7 +460,10 @@ class TestBatchGuards:
         async with store.claim(1) as batch:
             pass
 
-        with pytest.raises(RuntimeError, match="batch is closed"):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape("the outbox batch is closed: its claim block has already exited"),
+        ):
             await outcome(batch, message_id)
 
         row = await fetch_row(message_id)
@@ -438,7 +479,10 @@ class TestBatchGuards:
                 batches.append(batch)
                 raise KeyError("crash")
 
-        with pytest.raises(RuntimeError, match="batch is closed"):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape("the outbox batch is closed: its claim block has already exited"),
+        ):
             await outcome(batches[0], message_id)
 
 
@@ -491,7 +535,7 @@ class TestFullFlow:
                 # batch size of 1 keeps foreign pending rows untouched.
                 cursor = await conn.execute(
                     "UPDATE outbox SET available_at = %s WHERE aggregate_id = %s",
-                    (long_ago(-86400 * 365), payment.id),
+                    (FULL_FLOW_SENTINEL, payment.id),
                 )
                 # Guards the premise: with no row of its own, the relay would publish a foreign one.
                 assert cursor.rowcount == 1

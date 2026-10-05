@@ -32,10 +32,7 @@ class InMemoryClaimedBatch(ClaimedOutboxBatch):
         if message_id not in self._claimed_ids:
             raise ValueError(f"outbox message {message_id} was not claimed by this batch")
         if message_id in self._resolved_ids:
-            raise RuntimeError(
-                f"outbox message {message_id} is no longer pending in this batch:"
-                " only one outcome per message is allowed"
-            )
+            raise RuntimeError(f"outbox message {message_id} already has an outcome in this batch")
         self._resolved_ids.add(message_id)
 
     async def mark_published(self, message_id: int) -> None:

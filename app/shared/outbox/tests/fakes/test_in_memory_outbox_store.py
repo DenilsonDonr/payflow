@@ -1,3 +1,4 @@
+import re
 import uuid
 from collections.abc import Awaitable, Callable
 
@@ -109,14 +110,16 @@ class TestInMemoryBatchGuards:
     async def test_rejects_an_id_the_batch_did_not_claim(self, outcome: Outcome):
         store = InMemoryOutboxStore([make_message(1), make_message(2)])
 
-        with pytest.raises(ValueError, match="2"):
+        with pytest.raises(ValueError, match=r"^outbox message 2 was not claimed by this batch$"):
             async with store.claim(1) as batch:
                 await outcome(batch, 2)
 
     async def test_a_second_outcome_for_the_same_id_fails_and_rolls_back(self, outcome: Outcome):
         store = InMemoryOutboxStore([make_message(1)])
 
-        with pytest.raises(RuntimeError, match="1"):
+        with pytest.raises(
+            RuntimeError, match=r"^outbox message 1 already has an outcome in this batch$"
+        ):
             async with store.claim(1) as batch:
                 await batch.mark_published(1)
                 await outcome(batch, 1)
@@ -129,5 +132,8 @@ class TestInMemoryBatchGuards:
         async with store.claim(1) as batch:
             pass
 
-        with pytest.raises(RuntimeError, match="batch is closed"):
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape("the outbox batch is closed: its claim block has already exited"),
+        ):
             await outcome(batch, 1)

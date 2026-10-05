@@ -82,17 +82,17 @@ class PostgresClaimedOutboxBatch(ClaimedOutboxBatch):
         # Tracked here, not only in SQL: a reschedule leaves the row 'pending', so the status
         # predicate alone would let a second outcome through.
         if message_id in self._resolved_ids:
-            raise RuntimeError(
-                f"outbox message {message_id} already has an outcome in this batch:"
-                " only one outcome per message is allowed"
-            )
+            raise RuntimeError(f"outbox message {message_id} already has an outcome in this batch")
+        # Recorded before the await: two overlapping calls would otherwise both pass the check.
+        self._resolved_ids.add(message_id)
 
         cursor = await self._conn.execute(sql, params)
-        self._resolved_ids.add(message_id)
         if cursor.rowcount != 1:
+            # Defence in depth: the row is locked by this transaction, so this only fires for a
+            # row resolved outside this batch.
             raise RuntimeError(
-                f"outbox message {message_id} is no longer pending in this batch:"
-                " only one outcome per message is allowed"
+                f"outbox message {message_id} is no longer pending:"
+                " it was resolved outside this batch"
             )
 
 
