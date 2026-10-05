@@ -43,7 +43,9 @@ class TestRunBatchPacing:
         stop = asyncio.Event()
         use_case = ScriptedUseCase([BATCH_SIZE, BATCH_SIZE, 1], stop)
 
-        await asyncio.wait_for(run(use_case, stop, 5.0, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=5.0, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert len(use_case.call_times) == 3
 
@@ -51,7 +53,9 @@ class TestRunBatchPacing:
         stop = asyncio.Event()
         use_case = ScriptedUseCase([BATCH_SIZE - 1, 0], stop)
 
-        await asyncio.wait_for(run(use_case, stop, 0.05, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=0.05, batch_size=BATCH_SIZE), timeout=1
+        )
 
         gap = use_case.call_times[1] - use_case.call_times[0]
         assert gap >= 0.04
@@ -60,7 +64,9 @@ class TestRunBatchPacing:
         stop = asyncio.Event()
         use_case = ScriptedUseCase([0, 0], stop)
 
-        await asyncio.wait_for(run(use_case, stop, 0.05, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=0.05, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert use_case.call_times[1] - use_case.call_times[0] >= 0.04
 
@@ -71,14 +77,18 @@ class TestRunStopping:
         stop.set()
         use_case = ScriptedUseCase([0])
 
-        await asyncio.wait_for(run(use_case, stop, 5.0, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=5.0, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert use_case.call_times == []
 
     async def test_setting_the_stop_event_ends_the_loop_during_the_wait(self):
         stop = asyncio.Event()
         use_case = ScriptedUseCase([0, 0])
-        task = asyncio.create_task(run(use_case, stop, 30.0, BATCH_SIZE))
+        task = asyncio.create_task(
+            run(use_case, stop=stop, poll_interval=30.0, batch_size=BATCH_SIZE)
+        )
         while not use_case.call_times:
             await asyncio.sleep(0)
 
@@ -91,7 +101,9 @@ class TestRunStopping:
         stop = asyncio.Event()
         use_case = ScriptedUseCase([BATCH_SIZE, BATCH_SIZE], stop)
 
-        await asyncio.wait_for(run(use_case, stop, 5.0, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=5.0, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert len(use_case.call_times) == 2
 
@@ -106,7 +118,9 @@ class TestRunStopping:
                 finished.append(True)
                 return BATCH_SIZE
 
-        await asyncio.wait_for(run(SlowUseCase(), stop, 5.0, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(SlowUseCase(), stop=stop, poll_interval=5.0, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert finished == [True]
 
@@ -119,7 +133,9 @@ class TestRunFailureHandling:
         use_case = ScriptedUseCase([RuntimeError("db down"), 0], stop)
 
         with caplog.at_level(logging.ERROR, logger=relay_worker.__name__):
-            await asyncio.wait_for(run(use_case, stop, 0.01, BATCH_SIZE), timeout=1)
+            await asyncio.wait_for(
+                run(use_case, stop=stop, poll_interval=0.01, batch_size=BATCH_SIZE), timeout=1
+            )
 
         assert len(use_case.call_times) == 2
         records = [r for r in caplog.records if r.name == relay_worker.__name__]
@@ -131,14 +147,18 @@ class TestRunFailureHandling:
         stop = asyncio.Event()
         use_case = ScriptedUseCase([RuntimeError("boom"), 0], stop)
 
-        await asyncio.wait_for(run(use_case, stop, 0.05, BATCH_SIZE), timeout=1)
+        await asyncio.wait_for(
+            run(use_case, stop=stop, poll_interval=0.05, batch_size=BATCH_SIZE), timeout=1
+        )
 
         assert use_case.call_times[1] - use_case.call_times[0] >= 0.04
 
     async def test_cancellation_propagates(self):
         stop = asyncio.Event()
         use_case = HangingUseCase()
-        task = asyncio.create_task(run(use_case, stop, 0.01, BATCH_SIZE))
+        task = asyncio.create_task(
+            run(use_case, stop=stop, poll_interval=0.01, batch_size=BATCH_SIZE)
+        )
         while use_case.calls == 0:
             await asyncio.sleep(0)
 

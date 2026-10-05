@@ -116,7 +116,7 @@ async def _wait_for_stop(stop: asyncio.Event, seconds: float) -> None:
 
 
 async def run(
-    use_case: BatchRunner, stop: asyncio.Event, poll_interval: float, batch_size: int
+    use_case: BatchRunner, *, stop: asyncio.Event, poll_interval: float, batch_size: int
 ) -> None:
     """Relay batches until `stop` is set.
 
@@ -143,6 +143,12 @@ def warn_about_stand_in_publisher() -> None:
     )
 
 
+def install_signal_handlers(loop: asyncio.AbstractEventLoop, stop: asyncio.Event) -> None:
+    """SIGINT and SIGTERM ask the loop to stop after the batch in flight, never mid-batch."""
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = RelaySettings.from_env()
@@ -163,15 +169,18 @@ async def main() -> None:
     )
 
     stop = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
+    install_signal_handlers(asyncio.get_running_loop(), stop)
 
     warn_about_stand_in_publisher()
     await open_pool()
     try:
         logger.info("outbox relay started: %s", settings)
-        await run(use_case, stop, settings.poll_interval_seconds, settings.batch_size)
+        await run(
+            use_case,
+            stop=stop,
+            poll_interval=settings.poll_interval_seconds,
+            batch_size=settings.batch_size,
+        )
     finally:
         await close_pool()
         logger.info("outbox relay stopped")
