@@ -14,18 +14,37 @@ class InMemoryClaimedBatch(ClaimedOutboxBatch):
         self.published: list[int] = []
         self.rescheduled: dict[int, tuple[float, str]] = {}
         self.failed: dict[int, str] = {}
+        self._claimed_ids = {m.id for m in messages}
+        self._resolved_ids: set[int] = set()
+        self._closed = False
 
     @property
     def messages(self) -> list[OutboxMessage]:
         return self._messages
 
+    def close(self) -> None:
+        self._closed = True
+
+    def _guard(self, message_id: int) -> None:
+        # Same guards as the Postgres batch, so use-case tests catch misuse too.
+        if self._closed:
+            raise RuntimeError("the outbox batch is closed: its claim block has already exited")
+        if message_id not in self._claimed_ids:
+            raise ValueError(f"outbox message {message_id} was not claimed by this batch")
+        if message_id in self._resolved_ids:
+            raise RuntimeError(f"outbox message {message_id} already has an outcome in this batch")
+        self._resolved_ids.add(message_id)
+
     async def mark_published(self, message_id: int) -> None:
+        self._guard(message_id)
         self.published.append(message_id)
 
     async def reschedule(self, message_id: int, *, delay_seconds: float, error: str) -> None:
+        self._guard(message_id)
         self.rescheduled[message_id] = (delay_seconds, error)
 
     async def mark_failed(self, message_id: int, *, error: str) -> None:
+        self._guard(message_id)
         self.failed[message_id] = error
 
 
@@ -56,6 +75,8 @@ class InMemoryOutboxStore(OutboxStorePort):
         except BaseException:
             self.rollbacks += 1
             raise
+        finally:
+            batch.close()
         self._commit(batch)
 
     def _commit(self, batch: InMemoryClaimedBatch) -> None:

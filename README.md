@@ -32,3 +32,11 @@ Run the tests:
 ```bash
 uv run pytest
 ```
+
+Run the outbox relay, the worker that publishes the events payments write to the `outbox` table (stop it with Ctrl+C; the batch in flight finishes first):
+
+```bash
+uv run python -m app.shared.outbox.infrastructure.relay_worker
+```
+
+It reads the same `.env` as the API, plus optional `OUTBOX_*` tuning: `OUTBOX_BATCH_SIZE` (20), `OUTBOX_PUBLISH_TIMEOUT_SECONDS` (2), `OUTBOX_POLL_INTERVAL_SECONDS` (1), `OUTBOX_MAX_ATTEMPTS` (10), `OUTBOX_BACKOFF_BASE_SECONDS` (1) and `OUTBOX_BACKOFF_CAP_SECONDS` (300). Invalid values stop the worker at startup. For now it publishes through `LoggingEventPublisher`, a stand-in that only logs: events are marked published but go nowhere until a broker adapter exists.
