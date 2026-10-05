@@ -1,5 +1,6 @@
 import logging
 import uuid
+from dataclasses import replace
 
 import pytest
 
@@ -50,6 +51,14 @@ class TestLoggingEventPublisher:
         assert message.event_type in text
         assert message.aggregate_type in text
         assert str(message.aggregate_id) in text
+
+    async def test_record_includes_the_outbox_row_id(self, caplog: pytest.LogCaptureFixture):
+        message = replace(make_message(), id=4242)
+
+        with caplog.at_level(logging.INFO):
+            await LoggingEventPublisher().publish(message)
+
+        assert "outbox_id=4242" in publisher_records(caplog)[0].getMessage()
 
     async def test_returns_none(self):
         result = await LoggingEventPublisher().publish(make_message())

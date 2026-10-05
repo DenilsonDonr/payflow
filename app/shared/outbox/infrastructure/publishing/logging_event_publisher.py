@@ -11,7 +11,8 @@ class LoggingEventPublisher(EventPublisherPort):
 
     async def publish(self, message: OutboxMessage) -> None:
         logger.info(
-            "published event_id=%s event_type=%s aggregate_type=%s aggregate_id=%s",
+            "published outbox_id=%s event_id=%s event_type=%s aggregate_type=%s aggregate_id=%s",
+            message.id,
             message.event_id,
             message.event_type,
             message.aggregate_type,
