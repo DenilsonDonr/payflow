@@ -5,7 +5,12 @@ from app.shared.outbox.domain.outbox_message import OutboxMessage
 
 
 class ClaimedOutboxBatch(ABC):
-    """Rows locked by one `claim`, plus the outcomes the relay records for them."""
+    """Rows locked by one `claim`, plus the outcomes the relay records for them.
+
+    Misuse raises instead of writing: an id the batch did not claim is rejected
+    (`ValueError`), a message takes one outcome only, and the batch is unusable
+    once the claim block has exited (both `RuntimeError`).
+    """
 
     @property
     @abstractmethod

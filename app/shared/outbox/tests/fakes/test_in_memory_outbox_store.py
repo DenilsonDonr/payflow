@@ -1,8 +1,10 @@
 import uuid
+from collections.abc import Awaitable, Callable
 
 import pytest
 
 from app.shared.outbox.domain.outbox_message import OutboxMessage
+from app.shared.outbox.domain.ports.outbox_store_port import ClaimedOutboxBatch
 from app.shared.outbox.tests.fakes.in_memory_outbox_store import InMemoryOutboxStore
 
 
@@ -91,3 +93,41 @@ class TestInMemoryOutboxStoreRollback:
                 raise RuntimeError("crash mid-batch")
 
         assert await claimed_ids(store) == [1, 2]
+
+
+Outcome = Callable[[ClaimedOutboxBatch, int], Awaitable[None]]
+
+OUTCOMES: dict[str, Outcome] = {
+    "mark_published": lambda batch, i: batch.mark_published(i),
+    "reschedule": lambda batch, i: batch.reschedule(i, delay_seconds=1.0, error="boom"),
+    "mark_failed": lambda batch, i: batch.mark_failed(i, error="dead"),
+}
+
+
+@pytest.mark.parametrize("outcome", OUTCOMES.values(), ids=OUTCOMES.keys())
+class TestInMemoryBatchGuards:
+    async def test_rejects_an_id_the_batch_did_not_claim(self, outcome: Outcome):
+        store = InMemoryOutboxStore([make_message(1), make_message(2)])
+
+        with pytest.raises(ValueError, match="2"):
+            async with store.claim(1) as batch:
+                await outcome(batch, 2)
+
+    async def test_a_second_outcome_for_the_same_id_fails_and_rolls_back(self, outcome: Outcome):
+        store = InMemoryOutboxStore([make_message(1)])
+
+        with pytest.raises(RuntimeError, match="1"):
+            async with store.claim(1) as batch:
+                await batch.mark_published(1)
+                await outcome(batch, 1)
+
+        assert store.published == []
+        assert store.rollbacks == 1
+
+    async def test_the_batch_is_unusable_after_the_block(self, outcome: Outcome):
+        store = InMemoryOutboxStore([make_message(1)])
+        async with store.claim(1) as batch:
+            pass
+
+        with pytest.raises(RuntimeError, match="batch is closed"):
+            await outcome(batch, 1)

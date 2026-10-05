@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import LiteralString
 
 from psycopg import AsyncConnection
 from psycopg.rows import TupleRow
@@ -20,41 +21,79 @@ _CLAIM_SQL = (
     " FOR UPDATE SKIP LOCKED"
 )
 
+# Every outcome UPDATE also requires status = 'pending', so a row that already has an outcome in
+# this batch (or was resolved elsewhere) is never rewritten; the caller checks rowcount == 1.
 _MARK_PUBLISHED_SQL = (
-    "UPDATE outbox SET status = 'published', processed_at = clock_timestamp() WHERE id = %s"
+    "UPDATE outbox SET status = 'published', processed_at = clock_timestamp()"
+    " WHERE id = %s AND status = 'pending'"
 )
 
 _RESCHEDULE_SQL = (
     "UPDATE outbox SET attempts = attempts + 1,"
     " available_at = clock_timestamp() + make_interval(secs => %s),"
     " last_error = %s"
-    " WHERE id = %s"
+    " WHERE id = %s AND status = 'pending'"
 )
 
 _MARK_FAILED_SQL = (
-    "UPDATE outbox SET status = 'failed', attempts = attempts + 1, last_error = %s WHERE id = %s"
+    "UPDATE outbox SET status = 'failed', attempts = attempts + 1, last_error = %s"
+    " WHERE id = %s AND status = 'pending'"
 )
 
 
 class PostgresClaimedOutboxBatch(ClaimedOutboxBatch):
-    """Outcomes are written on the claim's own connection, so they share its transaction."""
+    """Outcomes are written on the claim's own connection, so they share its transaction.
+
+    Misuse raises instead of writing: raising inside the claim block rolls the whole batch back,
+    which is the right response to a programming error.
+    """
 
     def __init__(self, conn: AsyncConnection[TupleRow], messages: list[OutboxMessage]):
-        self._conn = conn
+        self._conn: AsyncConnection[TupleRow] | None = conn
         self._messages = messages
+        self._claimed_ids = {m.id for m in messages}
+        self._resolved_ids: set[int] = set()
 
     @property
     def messages(self) -> list[OutboxMessage]:
         return self._messages
 
+    def close(self) -> None:
+        # The connection goes back to the pool when the claim block exits; a late outcome would
+        # otherwise run inside someone else's transaction.
+        self._conn = None
+
     async def mark_published(self, message_id: int) -> None:
-        await self._conn.execute(_MARK_PUBLISHED_SQL, (message_id,))
+        await self._record(_MARK_PUBLISHED_SQL, (message_id,), message_id)
 
     async def reschedule(self, message_id: int, *, delay_seconds: float, error: str) -> None:
-        await self._conn.execute(_RESCHEDULE_SQL, (delay_seconds, error, message_id))
+        await self._record(_RESCHEDULE_SQL, (delay_seconds, error, message_id), message_id)
 
     async def mark_failed(self, message_id: int, *, error: str) -> None:
-        await self._conn.execute(_MARK_FAILED_SQL, (error, message_id))
+        await self._record(_MARK_FAILED_SQL, (error, message_id), message_id)
+
+    async def _record(
+        self, sql: LiteralString, params: tuple[object, ...], message_id: int
+    ) -> None:
+        if self._conn is None:
+            raise RuntimeError("the outbox batch is closed: its claim block has already exited")
+        if message_id not in self._claimed_ids:
+            raise ValueError(f"outbox message {message_id} was not claimed by this batch")
+        # Tracked here, not only in SQL: a reschedule leaves the row 'pending', so the status
+        # predicate alone would let a second outcome through.
+        if message_id in self._resolved_ids:
+            raise RuntimeError(
+                f"outbox message {message_id} already has an outcome in this batch:"
+                " only one outcome per message is allowed"
+            )
+
+        cursor = await self._conn.execute(sql, params)
+        self._resolved_ids.add(message_id)
+        if cursor.rowcount != 1:
+            raise RuntimeError(
+                f"outbox message {message_id} is no longer pending in this batch:"
+                " only one outcome per message is allowed"
+            )
 
 
 class PostgresOutboxStore(OutboxStorePort):
@@ -85,4 +124,8 @@ class PostgresOutboxStore(OutboxStorePort):
                 )
                 for row in rows
             ]
-            yield PostgresClaimedOutboxBatch(conn, messages)
+            batch = PostgresClaimedOutboxBatch(conn, messages)
+            try:
+                yield batch
+            finally:
+                batch.close()

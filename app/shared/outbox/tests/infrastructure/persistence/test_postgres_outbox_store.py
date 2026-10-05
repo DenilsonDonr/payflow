@@ -18,6 +18,7 @@ from app.modules.payments.infrastructure.persistence.repository.postgres_payment
     PostgresPaymentRepository,
 )
 from app.shared.outbox.application.relay_outbox_batch_use_case import RelayOutboxBatchUseCase
+from app.shared.outbox.domain.ports.outbox_store_port import ClaimedOutboxBatch
 from app.shared.outbox.infrastructure.persistence.postgres_outbox_store import PostgresOutboxStore
 from app.shared.outbox.infrastructure.publishing.logging_event_publisher import (
     LoggingEventPublisher,
@@ -42,6 +43,16 @@ def long_ago(seconds: int) -> datetime:
     return LONG_AGO + timedelta(seconds=seconds)
 
 
+async def sweep_stale_test_rows(pool: AsyncConnectionPool[AsyncConnection[TupleRow]]) -> None:
+    # Rows left by an interrupted run. No real row is this old: available_at defaults to now().
+    async with pool.connection() as conn:
+        await conn.execute(
+            "DELETE FROM payments WHERE id IN"
+            " (SELECT aggregate_id FROM outbox WHERE available_at < '2001-01-01')"
+        )
+        await conn.execute("DELETE FROM outbox WHERE available_at < '2001-01-01'")
+
+
 @pytest.fixture
 async def pool() -> AsyncGenerator[AsyncConnectionPool[AsyncConnection[TupleRow]]]:
     # A pool of its own, bound to this test's event loop. max_size 3: the concurrency test holds
@@ -56,6 +67,7 @@ async def pool() -> AsyncGenerator[AsyncConnectionPool[AsyncConnection[TupleRow]
         pytest.skip(
             "PostgreSQL server is not available. From the project root, run 'docker compose -f docker/development/compose.dev.yaml up -d' to start it, then re-run these integration tests."
         )
+    await sweep_stale_test_rows(pool)
     yield pool
     await pool.close()
 
@@ -79,6 +91,8 @@ async def insert_row(
         status: str = "pending",
         attempts: int = 0,
         payload: dict[str, Any] | None = None,
+        event_id: uuid.UUID | None = None,
+        aggregate_id: uuid.UUID | None = None,
     ) -> int:
         async with pool.connection() as conn:
             cursor = await conn.execute(
@@ -87,8 +101,8 @@ async def insert_row(
                 "  status, attempts, available_at)"
                 " VALUES (%s, 'test', %s, 'test.event', %s, %s, %s, %s) RETURNING id",
                 (
-                    uuid.uuid4(),
-                    uuid.uuid4(),
+                    event_id or uuid.uuid4(),
+                    aggregate_id or uuid.uuid4(),
                     Jsonb(payload if payload is not None else {}),
                     status,
                     attempts,
@@ -169,23 +183,35 @@ class TestClaim:
     async def test_respects_the_limit(self, store: PostgresOutboxStore, insert_row: InsertRow):
         first = await insert_row(available_at=long_ago(1))
         second = await insert_row(available_at=long_ago(2))
-        await insert_row(available_at=long_ago(3))
+        third = await insert_row(available_at=long_ago(3))
 
         async with store.claim(2) as batch:
-            claimed_ids = [m.id for m in batch.messages]
+            claimed = [m.id for m in batch.messages]
 
-        assert claimed_ids == [first, second]
+        # Only own ids are compared: the shared dev DB may hold rows the test does not own.
+        assert len([i for i in claimed if i in {first, second, third}]) == 2
+        assert [i for i in claimed if i in {first, second, third}] == [first, second]
 
     async def test_returns_the_payload_as_json_text_and_the_stored_attempts(
         self, store: PostgresOutboxStore, insert_row: InsertRow
     ):
         body = {"amount": "10.00", "currency": "USD", "items": [1, 2]}
-        message_id = await insert_row(available_at=long_ago(1), attempts=3, payload=body)
+        event_id = uuid.uuid4()
+        aggregate_id = uuid.uuid4()
+        message_id = await insert_row(
+            available_at=long_ago(1),
+            attempts=3,
+            payload=body,
+            event_id=event_id,
+            aggregate_id=aggregate_id,
+        )
 
         async with store.claim(1) as batch:
             [message] = batch.messages
 
         assert message.id == message_id
+        assert message.event_id == event_id
+        assert message.aggregate_id == aggregate_id
         assert isinstance(message.payload, str)
         assert json.loads(message.payload) == body
         assert message.attempts == 3
@@ -315,6 +341,105 @@ class TestOutcomes:
             assert row["attempts"] == attempts
             assert row["last_error"] is None
             assert row["processed_at"] is None
+
+
+Outcome = Callable[[ClaimedOutboxBatch, int], Awaitable[None]]
+
+OUTCOMES: dict[str, Outcome] = {
+    "mark_published": lambda batch, i: batch.mark_published(i),
+    "reschedule": lambda batch, i: batch.reschedule(i, delay_seconds=60, error="boom"),
+    "mark_failed": lambda batch, i: batch.mark_failed(i, error="boom"),
+}
+
+
+@pytest.mark.parametrize("outcome", OUTCOMES.values(), ids=OUTCOMES.keys())
+class TestBatchGuards:
+    async def test_rejects_an_id_the_batch_did_not_claim(
+        self,
+        outcome: Outcome,
+        store: PostgresOutboxStore,
+        insert_row: InsertRow,
+        fetch_row: FetchRow,
+    ):
+        claimed = await insert_row(available_at=long_ago(1))
+        # Not due, so never claimed, yet still a pending row the UPDATE could reach by id.
+        unclaimed = await insert_row(available_at=datetime.now(UTC) + timedelta(hours=1))
+
+        with pytest.raises(ValueError, match=str(unclaimed)):
+            async with store.claim(1) as batch:
+                assert [m.id for m in batch.messages] == [claimed]
+                await outcome(batch, unclaimed)
+
+        row = await fetch_row(unclaimed)
+        assert (row["status"], row["attempts"], row["last_error"]) == ("pending", 0, None)
+
+    async def test_a_second_outcome_for_the_same_id_fails_and_rolls_the_batch_back(
+        self,
+        outcome: Outcome,
+        store: PostgresOutboxStore,
+        insert_row: InsertRow,
+        fetch_row: FetchRow,
+    ):
+        first = await insert_row(available_at=long_ago(1))
+        second = await insert_row(available_at=long_ago(2))
+
+        with pytest.raises(RuntimeError, match=str(first)):
+            async with store.claim(2) as batch:
+                await batch.mark_published(second)
+                await batch.mark_published(first)
+                await outcome(batch, first)
+
+        for message_id in (first, second):
+            row = await fetch_row(message_id)
+            assert (row["status"], row["attempts"], row["processed_at"]) == ("pending", 0, None)
+
+    async def test_a_second_outcome_after_a_reschedule_also_fails(
+        self,
+        outcome: Outcome,
+        store: PostgresOutboxStore,
+        insert_row: InsertRow,
+        fetch_row: FetchRow,
+    ):
+        # A reschedule leaves the row 'pending', so the status predicate alone cannot catch this.
+        message_id = await insert_row(available_at=long_ago(1))
+
+        with pytest.raises(RuntimeError, match=str(message_id)):
+            async with store.claim(1) as batch:
+                await batch.reschedule(message_id, delay_seconds=60, error="boom")
+                await outcome(batch, message_id)
+
+        row = await fetch_row(message_id)
+        assert (row["status"], row["attempts"], row["last_error"]) == ("pending", 0, None)
+
+    async def test_the_batch_is_unusable_after_the_block(
+        self,
+        outcome: Outcome,
+        store: PostgresOutboxStore,
+        insert_row: InsertRow,
+        fetch_row: FetchRow,
+    ):
+        message_id = await insert_row(available_at=long_ago(1))
+        async with store.claim(1) as batch:
+            pass
+
+        with pytest.raises(RuntimeError, match="batch is closed"):
+            await outcome(batch, message_id)
+
+        row = await fetch_row(message_id)
+        assert (row["status"], row["attempts"]) == ("pending", 0)
+
+    async def test_the_batch_is_unusable_after_a_block_that_raised(
+        self, outcome: Outcome, store: PostgresOutboxStore, insert_row: InsertRow
+    ):
+        message_id = await insert_row(available_at=long_ago(1))
+        batches: list[ClaimedOutboxBatch] = []
+        with pytest.raises(KeyError):
+            async with store.claim(1) as batch:
+                batches.append(batch)
+                raise KeyError("crash")
+
+        with pytest.raises(RuntimeError, match="batch is closed"):
+            await outcome(batches[0], message_id)
 
 
 class TestConcurrentClaims:
