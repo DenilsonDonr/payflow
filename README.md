@@ -6,6 +6,22 @@ A payment-processing backend built as a **modular monolith**. This is a learning
 
 A single deployable, organized with hexagonal architecture and split by module — each with its own domain, application, and infrastructure layers. New capabilities are added as modules inside the same monolith, not as separate services.
 
+Writing a payment and announcing it are one transaction; delivering that announcement is a separate process. The deployable pieces, and where the chain currently stops:
+
+```mermaid
+flowchart LR
+    C[Client] -->|POST /payments| API[API - FastAPI]
+    API -->|one transaction| DB[(PostgreSQL: payments + outbox)]
+    RW[Relay worker - separate process] -->|claim - SKIP LOCKED| DB
+    RW -->|publish| BR[Message broker<br/>not built yet - a stand-in logs instead]
+    BR -.->|no consumer yet| PEND[payment stays PENDING]
+    style DB fill:#b2f2bb,stroke:#2f9e44,color:#000
+    style BR stroke-dasharray: 5 5
+    style PEND stroke-dasharray: 5 5
+```
+
+How the relay drains that table — the batch, the retries and the backoff — is in [docs/outbox.md](docs/outbox.md).
+
 ## Stack
 
 | Technology     | Version | Role                          |
@@ -39,4 +55,4 @@ Run the outbox relay, the worker that publishes the events payments write to the
 uv run python -m app.shared.outbox.infrastructure.relay_worker
 ```
 
-It reads the same `.env` as the API, plus optional `OUTBOX_*` tuning: `OUTBOX_BATCH_SIZE` (20), `OUTBOX_PUBLISH_TIMEOUT_SECONDS` (2), `OUTBOX_POLL_INTERVAL_SECONDS` (1), `OUTBOX_MAX_ATTEMPTS` (10), `OUTBOX_BACKOFF_BASE_SECONDS` (1) and `OUTBOX_BACKOFF_CAP_SECONDS` (300). Invalid values stop the worker at startup. For now it publishes through `LoggingEventPublisher`, a stand-in that only logs: events are marked published but go nowhere until a broker adapter exists.
+It reads the same `.env` as the API, plus optional `OUTBOX_*` tuning: `OUTBOX_BATCH_SIZE` (20), `OUTBOX_PUBLISH_TIMEOUT_SECONDS` (2), `OUTBOX_POLL_INTERVAL_SECONDS` (1), `OUTBOX_MAX_ATTEMPTS` (10), `OUTBOX_BACKOFF_BASE_SECONDS` (1) and `OUTBOX_BACKOFF_CAP_SECONDS` (300). Invalid values stop the worker at startup. For now it publishes through `LoggingEventPublisher`, a stand-in that only logs: events are marked published but go nowhere until a broker adapter exists — [docs/outbox.md](docs/outbox.md) explains what each setting changes.
