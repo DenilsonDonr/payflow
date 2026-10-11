@@ -24,7 +24,7 @@ services:
       POSTGRES_PASSWORD: mysecretpassword
       POSTGRES_DB: payflow_db_test
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     # No named volume: the data directory lives in RAM and dies with the container, so every
     # `up` starts from an empty database that migrations then bring to head.
     tmpfs:

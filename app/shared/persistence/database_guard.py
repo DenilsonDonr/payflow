@@ -12,7 +12,6 @@ def require_test_database(database_name: str) -> None:
         raise RuntimeError(
             f"Refusing to run the test suite against database {database_name!r}: its name does "
             f"not end in {_TEST_DATABASE_SUFFIX!r}. Tests must never touch the development "
-            "database. Check that .env.test exists at the repo root and sets "
-            "POSTGRES_DB=payflow_db_test and POSTGRES_PORT=5433, and that no exported "
-            "POSTGRES_DB overrides it."
+            "database. The database comes from .env.test at the repo root: check that the file "
+            "exists and selects the throwaway test database."
         )

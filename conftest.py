@@ -1,4 +1,5 @@
 import os
+import socket
 import subprocess
 import sys
 import warnings
@@ -33,9 +34,12 @@ def _migrated_test_database() -> None:  # pyright: ignore[reportUnusedFunction]
     The test container keeps its data in tmpfs, so it is empty after every restart and nothing
     else would create the schema. `alembic upgrade head` is a no-op when already at head.
 
-    Two outcomes, depending on whether the database answers a short probe:
-    - Unreachable: only a warning. With Postgres down the unit tests must still run, and the
-      integration fixtures already skip when they cannot connect.
+    Three outcomes, depending on how the database answers a short probe:
+    - Nothing answers (connection refused, timeout, host unreachable): only a warning. With
+      Postgres down the unit tests must still run, and the integration fixtures already skip when
+      they cannot connect.
+    - A server answers but rejects us (bad password, unknown role or database): the session stops
+      with the error. Treating it as "down" would skip every integration test and report green.
     - Reachable but `alembic upgrade head` fails or times out: the session stops with the full
       alembic output. Carrying on would run the suite against a stale or missing schema and
       report confusing failures far from the real cause.
@@ -44,16 +48,29 @@ def _migrated_test_database() -> None:  # pyright: ignore[reportUnusedFunction]
     # import time (see the ordering rule above).
     import psycopg
 
-    from app.shared.persistence.postgres_connection import CONNINFO
+    from app.shared.persistence.postgres_connection import CONNINFO, host, port
 
+    # psycopg gives no structured way to tell "nobody answered" from "the server said no": both
+    # raise OperationalError with sqlstate None and only the message differs. A plain TCP connect
+    # separates them without parsing text: if it succeeds a server is there, so any later psycopg
+    # error is a rejection or a protocol failure, not an absent database.
     try:
-        psycopg.connect(CONNINFO, connect_timeout=2).close()
-    except psycopg.OperationalError as error:
+        socket.create_connection((host, int(port)), timeout=2).close()
+    except OSError as error:
         warnings.warn(
             f"test database unreachable ({error}); skipping migrations, integration tests skip",
             stacklevel=1,
         )
         return
+
+    try:
+        psycopg.connect(CONNINFO, connect_timeout=2).close()
+    except psycopg.Error as error:
+        pytest.exit(
+            f"test database answered on TCP but the connection failed: {error}. Either the "
+            "credentials are wrong or Postgres is not ready yet (start it with `up -d --wait`).",
+            returncode=1,
+        )
 
     try:
         result = subprocess.run(
