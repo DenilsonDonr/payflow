@@ -13,6 +13,30 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Throwaway database for the test suite. Separate container rather than a second database in
+  # `db`, because the outbox relay claims ANY pending row: a test pointed at the wrong database
+  # would publish the developer's own data. Here that is impossible by construction.
+  db-test:
+    image: postgres:17
+    container_name: my_postgres_payflow_test
+    environment:
+      POSTGRES_USER: postgres_payflow
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: payflow_db_test
+    ports:
+      - "5433:5432"
+    # No named volume: the data directory lives in RAM and dies with the container, so every
+    # `up` starts from an empty database that migrations then bring to head.
+    tmpfs:
+      - /var/lib/postgresql/data
+    # Lets `up -d --wait` block until Postgres accepts connections, so the migration that pytest
+    # runs on startup does not race the container.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_payflow -d payflow_db_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
 volumes:
   postgres_data:
     driver: local
