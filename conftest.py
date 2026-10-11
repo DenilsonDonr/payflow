@@ -33,10 +33,28 @@ def _migrated_test_database() -> None:  # pyright: ignore[reportUnusedFunction]
     The test container keeps its data in tmpfs, so it is empty after every restart and nothing
     else would create the schema. `alembic upgrade head` is a no-op when already at head.
 
-    A failure never fails the session: with Postgres down the unit tests must still run, and the
-    integration fixtures already skip when they cannot connect. It is surfaced as a warning so a
-    broken migration against a reachable database is not silent.
+    Two outcomes, depending on whether the database answers a short probe:
+    - Unreachable: only a warning. With Postgres down the unit tests must still run, and the
+      integration fixtures already skip when they cannot connect.
+    - Reachable but `alembic upgrade head` fails or times out: the session stops with the full
+      alembic output. Carrying on would run the suite against a stale or missing schema and
+      report confusing failures far from the real cause.
     """
+    # Imported here, not at the top: by now the environment is final, and the module reads it at
+    # import time (see the ordering rule above).
+    import psycopg
+
+    from app.shared.persistence.postgres_connection import CONNINFO
+
+    try:
+        psycopg.connect(CONNINFO, connect_timeout=2).close()
+    except psycopg.OperationalError as error:
+        warnings.warn(
+            f"test database unreachable ({error}); skipping migrations, integration tests skip",
+            stacklevel=1,
+        )
+        return
+
     try:
         result = subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
@@ -48,8 +66,13 @@ def _migrated_test_database() -> None:  # pyright: ignore[reportUnusedFunction]
             check=False,
         )
     except subprocess.TimeoutExpired:
-        warnings.warn("alembic upgrade head timed out; integration tests may skip", stacklevel=1)
-        return
+        pytest.exit(
+            "alembic upgrade head timed out against a reachable test database", returncode=1
+        )
     if result.returncode != 0:
-        last_line = (result.stderr.strip().splitlines() or ["no output"])[-1]
-        warnings.warn(f"alembic upgrade head failed (is db-test up?): {last_line}", stacklevel=1)
+        pytest.exit(
+            "alembic upgrade head failed against a reachable test database:\n"
+            # alembic prints some failures (e.g. a bad config) to stdout, so keep both streams.
+            f"{result.stderr}{result.stdout}",
+            returncode=1,
+        )

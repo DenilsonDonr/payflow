@@ -30,9 +30,11 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     # Lets `up -d --wait` block until Postgres accepts connections, so the migration that pytest
-    # runs on startup does not race the container.
+    # runs on startup does not race the container. It probes over TCP on purpose: during initdb
+    # the image runs a temporary server that listens only on the Unix socket and then restarts,
+    # so a socket probe can report healthy before the real server is up.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres_payflow -d payflow_db_test"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres_payflow -d payflow_db_test"]
       interval: 2s
       timeout: 3s
       retries: 15
