@@ -37,17 +37,21 @@ How the relay drains that table — the batch, the retries and the backoff — i
 
 ## Development
 
-Start the development database:
+Start the databases (`--wait` blocks until both are healthy):
 
 ```bash
-docker compose -f docker/development/compose.dev.yaml up -d
+docker compose -f docker/development/compose.dev.yaml up -d --wait
 ```
+
+This starts two Postgres containers: the development database (`payflow_db_dev`, port 5432, persistent) and a throwaway one for tests (`payflow_db_test`, port 5433, kept in RAM and empty after every restart).
 
 Run the tests:
 
 ```bash
 uv run pytest
 ```
+
+The suite always runs against `payflow_db_test` (port 5433), never the development database: the versioned `.env.test` selects it and the test session aborts if the database name does not end in `_test`. Migrations are applied to it automatically at the start of the session. Without Docker, `uv run pytest -m "not integration"` still works.
 
 Run the outbox relay, the worker that publishes the events payments write to the `outbox` table (stop it with Ctrl+C; the batch in flight finishes first):
 
